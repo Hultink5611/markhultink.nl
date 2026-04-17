@@ -179,6 +179,129 @@
   }
   @keyframes blink{ 50%{ opacity: 0; } }
 
+  /* ——— Draggable H (hook for LP string) ——— */
+  .char--hook{
+    cursor: grab;
+    touch-action: none;
+    position: relative;
+    will-change: transform;
+  }
+  .char--hook:active{ cursor: grabbing; }
+  .char--hook.char--dragged{ cursor: grabbing; }
+
+  /* ——— LP player ——— */
+  .lp{
+    position: relative;
+    width: 200px;
+    height: 112px;
+    margin: 78px auto 0;
+    pointer-events: none;
+  }
+  .lp-platter{
+    position: absolute;
+    left: 0; top: 0;
+    width: 112px; height: 112px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, transparent 14px, var(--ink) 15px, var(--ink) 16px, transparent 17px),
+      radial-gradient(circle, transparent 22px, var(--ink) 23px, var(--ink) 23.5px, transparent 24.5px),
+      radial-gradient(circle, transparent 30px, var(--ink) 31px, var(--ink) 31.5px, transparent 32.5px),
+      radial-gradient(circle, transparent 38px, var(--ink) 39px, var(--ink) 39.5px, transparent 40.5px),
+      radial-gradient(circle, transparent 46px, var(--ink) 47px, var(--ink) 47.5px, transparent 48.5px),
+      radial-gradient(circle, var(--ink) 50%, transparent 50%);
+    opacity: 0.85;
+    transition: transform 0.4s ease-out;
+  }
+  .lp.is-playing .lp-platter{
+    animation: lp-spin 2.2s linear infinite;
+  }
+  @keyframes lp-spin { to { transform: rotate(360deg); } }
+  .lp-label{
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 34px; height: 34px;
+    margin: -17px 0 0 -17px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+  }
+  .lp-hole{
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 3px; height: 3px;
+    margin: -1.5px 0 0 -1.5px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+  }
+
+  /* Tonearm: pivot at right side, arm extends to the left */
+  .lp-arm-mount{
+    position: absolute;
+    right: 22px; top: 8px;
+    width: 10px; height: 10px;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+    background: var(--bg);
+  }
+  .lp-arm{
+    position: absolute;
+    left: 5px; top: 50%;
+    width: 86px; height: 2px;
+    margin-top: -1px;
+    background: var(--ink);
+    transform-origin: 0 50%;
+    transform: rotate(calc(-24deg + var(--arm-angle, 0deg)));
+    transition: transform 60ms linear;
+  }
+  .lp-arm::after{
+    content: '';
+    position: absolute;
+    left: -2px; top: -3px;
+    width: 4px; height: 8px;
+    background: var(--ink);
+  }
+  .lp-arm-head{
+    position: absolute;
+    right: -6px; top: -4px;
+    width: 12px; height: 10px;
+    background: var(--ink);
+    border-radius: 1px;
+  }
+
+  .lp-hint{
+    position: absolute;
+    left: 50%;
+    bottom: -26px;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--mute);
+    white-space: nowrap;
+    opacity: 0.7;
+    transition: opacity 400ms;
+    pointer-events: none;
+  }
+  .lp.is-playing .lp-hint{ opacity: 0; }
+
+  /* SVG string line — spans full hero-inner */
+  .lp-string{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .lp-string line{
+    stroke: var(--ink);
+    stroke-width: 1;
+    stroke-linecap: round;
+    opacity: 0.5;
+  }
+
   .hero-meta{
     position: absolute; z-index: 2;
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -724,6 +847,21 @@
   <div class="hero-inner">
     <h1 class="hero-name" id="heroName" aria-label="Mark Hultink"></h1>
     <div class="hero-tag" id="heroTag"><span id="heroTagText"></span><span class="caret"></span></div>
+    <div class="lp" id="lp" aria-hidden="true">
+      <div class="lp-platter" id="lpPlatter">
+        <div class="lp-label"></div>
+        <div class="lp-hole"></div>
+      </div>
+      <div class="lp-arm-mount" id="lpArmMount">
+        <div class="lp-arm" id="lpArm">
+          <div class="lp-arm-head"></div>
+        </div>
+      </div>
+      <div class="lp-hint" id="lpHint">sleep de H naar beneden</div>
+    </div>
+    <svg class="lp-string" id="lpString" aria-hidden="true">
+      <line id="lpStringLine" x1="0" y1="0" x2="0" y2="0"></line>
+    </svg>
   </div>
   <div class="hero-meta hero-sprite">
     <canvas id="sprite" width="16" height="16"></canvas>
@@ -969,7 +1107,8 @@
   el.innerHTML = '';
   [...target].forEach((c,i)=>{
     const span = document.createElement('span');
-    span.className = 'char';
+    span.className = 'char' + (i === 5 ? ' char--hook' : ''); // index 5 = H in Hultink
+    if (i === 5) span.id = 'heroLetterH';
     span.textContent = c === ' ' ? '\u00A0' : c;
     span.style.transition = 'opacity .5s ease, transform .6s cubic-bezier(.2,.8,.2,1), filter .5s ease';
     el.appendChild(span);
@@ -2547,6 +2686,311 @@ function playTick(key){
       if (v) generate(v);
     });
   }
+})();
+
+/* =========================================================
+   LP SPELER — H van Hultink = haak, tonearm, lofi + geknisper
+   ========================================================= */
+(()=>{
+  // Wait until hero name DOM is built
+  const init = () => {
+    const hero = document.querySelector('#hero .hero-inner');
+    const H = document.getElementById('heroLetterH');
+    const lp = document.getElementById('lp');
+    const arm = document.getElementById('lpArm');
+    const armMount = document.getElementById('lpArmMount');
+    const stringSvg = document.getElementById('lpString');
+    const stringLine = document.getElementById('lpStringLine');
+    if (!H || !lp || !arm || !stringLine) {
+      setTimeout(init, 200);
+      return;
+    }
+
+    const MAX_DRAG = 48;        // how far H can be pulled down
+    const DROP_THRESH = 26;     // dragged past this = needle drops
+    let currentDrag = 0;        // 0..MAX_DRAG
+    let dragging = false;
+    let locked = false;         // true when needle is down and music plays
+    let startY = 0;
+    let startDrag = 0;
+
+    // ——— Lofi engine ———
+    const Lofi = (() => {
+      let ctx = null, master = null, crackleGain = null;
+      let playing = false;
+      let stopTimers = [];
+      let nextBarAt = 0;
+
+      function ensure(){
+        if (ctx) return;
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        master = ctx.createGain();
+        master.gain.value = 0;
+        // Warm lowpass — the "lofi" filter
+        const lowpass = ctx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = 2800;
+        lowpass.Q.value = 0.5;
+        master.connect(lowpass).connect(ctx.destination);
+      }
+
+      function startCrackle(){
+        if (crackleGain) return;
+        const bufSize = ctx.sampleRate * 3;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++){
+          // Base low noise + occasional pops
+          let v = (Math.random() * 2 - 1) * 0.08;
+          if (Math.random() < 0.0008) v += (Math.random() * 2 - 1) * 0.9;
+          data[i] = v;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 1200;
+        const g = ctx.createGain();
+        g.gain.value = 0.18;
+        src.connect(hp).connect(g).connect(master);
+        src.start();
+        crackleGain = g;
+      }
+
+      function kick(t){
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(120, t);
+        o.frequency.exponentialRampToValueAtTime(38, t + 0.18);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.55, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+        o.connect(g).connect(master);
+        o.start(t); o.stop(t + 0.4);
+      }
+      function hat(t, vol = 0.08){
+        const dur = 0.05;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 6500;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(hp).connect(g).connect(master);
+        src.start(t);
+      }
+      function snare(t){
+        const dur = 0.14;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 1800;
+        bp.Q.value = 0.7;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(bp).connect(g).connect(master);
+        src.start(t);
+      }
+      function note(t, freq, dur, vol = 0.15, type = 'sine'){
+        const o = ctx.createOscillator();
+        o.type = type;
+        o.frequency.value = freq;
+        // tiny detune for warmth
+        o.detune.value = (Math.random() - 0.5) * 8;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + 0.08);
+        g.gain.setTargetAtTime(0.0001, t + dur * 0.6, dur * 0.25);
+        o.connect(g).connect(master);
+        o.start(t);
+        o.stop(t + dur + 0.3);
+      }
+
+      // Chord progression: Am — F — C — G (i - VI - III - VII in Am) — classic lofi
+      const chords = [
+        { root: 110.00, notes: [220.00, 261.63, 329.63] }, // Am
+        { root: 87.31,  notes: [174.61, 220.00, 261.63] }, // F
+        { root: 130.81, notes: [196.00, 261.63, 329.63] }, // C
+        { root: 98.00,  notes: [196.00, 246.94, 293.66] }, // G
+      ];
+
+      function scheduleBar(barIdx, barStart, beat){
+        const chord = chords[barIdx % chords.length];
+        // Pad chord across bar
+        chord.notes.forEach(f => note(barStart, f, beat * 3.6, 0.06, 'sine'));
+        // Bass on beat 1 and beat 3
+        note(barStart, chord.root, beat * 1.3, 0.18, 'triangle');
+        note(barStart + beat * 2, chord.root, beat * 1.3, 0.18, 'triangle');
+        // Drums — lofi boom-bap
+        kick(barStart);
+        hat(barStart + beat * 0.5);
+        snare(barStart + beat * 1);
+        hat(barStart + beat * 1.5);
+        kick(barStart + beat * 2);
+        kick(barStart + beat * 2.5);
+        hat(barStart + beat * 2.75);
+        snare(barStart + beat * 3);
+        hat(barStart + beat * 3.5);
+      }
+
+      function scheduleLoop(){
+        if (!playing) return;
+        const BPM = 70;
+        const beat = 60 / BPM;
+        const barLen = beat * 4;
+        const lookahead = 0.2;
+        while (nextBarAt < ctx.currentTime + lookahead * 4){
+          const bar = Math.round((nextBarAt - startAt) / barLen);
+          scheduleBar(bar, nextBarAt, beat);
+          nextBarAt += barLen;
+        }
+        stopTimers.push(setTimeout(scheduleLoop, 300));
+      }
+
+      let startAt = 0;
+      function play(){
+        ensure();
+        ctx.resume();
+        if (playing) return;
+        playing = true;
+        startCrackle();
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+        master.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 0.8);
+        startAt = ctx.currentTime + 0.1;
+        nextBarAt = startAt;
+        scheduleLoop();
+      }
+
+      function stop(){
+        if (!playing) return;
+        playing = false;
+        stopTimers.forEach(clearTimeout);
+        stopTimers = [];
+        if (ctx){
+          master.gain.cancelScheduledValues(ctx.currentTime);
+          master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+          master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+        }
+      }
+
+      return { play, stop };
+    })();
+
+    // ——— Visuals: apply drag to H + arm + string ———
+    function applyDrag(d){
+      currentDrag = Math.max(0, Math.min(MAX_DRAG, d));
+      H.style.transform = 'translateY(' + currentDrag + 'px)';
+      // Arm angle: 0 = rest (fully up, -24deg base), MAX_DRAG = needle on record (0 extra)
+      // We want angle to grow (become less negative) as drag increases
+      const armAngle = (currentDrag / MAX_DRAG) * 24; // 0..24deg
+      arm.style.setProperty('--arm-angle', armAngle + 'deg');
+      updateString();
+    }
+
+    function updateString(){
+      const heroRect = hero.getBoundingClientRect();
+      const hRect = H.getBoundingClientRect();
+      const mRect = armMount.getBoundingClientRect();
+      // Anchor points in hero-local coords
+      const hx = (hRect.left + hRect.width / 2) - heroRect.left;
+      const hy = hRect.bottom - heroRect.top - 4;
+      const mx = (mRect.left + mRect.width / 2) - heroRect.left;
+      const my = (mRect.top + mRect.height / 2) - heroRect.top;
+      stringLine.setAttribute('x1', hx);
+      stringLine.setAttribute('y1', hy);
+      stringLine.setAttribute('x2', mx);
+      stringLine.setAttribute('y2', my);
+    }
+
+    // ——— Drag handlers ———
+    function onDown(e){
+      if (locked) {
+        // Lifting the needle: start from locked position (MAX_DRAG)
+        dragging = true;
+        startY = (e.touches ? e.touches[0].clientY : e.clientY);
+        startDrag = currentDrag;
+        H.classList.add('char--dragged');
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+      dragging = true;
+      startY = (e.touches ? e.touches[0].clientY : e.clientY);
+      startDrag = currentDrag;
+      H.classList.add('char--dragged');
+      if (e.cancelable) e.preventDefault();
+    }
+    function onMove(e){
+      if (!dragging) return;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY);
+      const dy = y - startY;
+      applyDrag(startDrag + dy);
+      if (e.cancelable) e.preventDefault();
+    }
+    function onUp(){
+      if (!dragging) return;
+      dragging = false;
+      H.classList.remove('char--dragged');
+      if (currentDrag >= DROP_THRESH){
+        // Lock needle down
+        applyDrag(MAX_DRAG);
+        if (!locked){
+          locked = true;
+          lp.classList.add('is-playing');
+          Lofi.play();
+        }
+      } else {
+        // Snap back up
+        animateDrag(currentDrag, 0, 380, () => {
+          if (locked){
+            locked = false;
+            lp.classList.remove('is-playing');
+            Lofi.stop();
+          }
+        });
+      }
+    }
+
+    function animateDrag(from, to, dur, cb){
+      const start = performance.now();
+      function step(now){
+        const k = Math.min(1, (now - start) / dur);
+        const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+        applyDrag(from + (to - from) * e);
+        if (k < 1) requestAnimationFrame(step);
+        else if (cb) cb();
+      }
+      requestAnimationFrame(step);
+    }
+
+    H.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+
+    // Keep string aligned on resize + scroll
+    window.addEventListener('resize', updateString);
+    window.addEventListener('scroll', updateString, { passive: true });
+
+    // Wait a beat for hero-name letter animations to settle, then set the string
+    setTimeout(() => { applyDrag(0); updateString(); }, 1500);
+  };
+  if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(init, 100);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 100));
 })();
 
 /* =========================================================
