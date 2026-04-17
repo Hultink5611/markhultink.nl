@@ -267,6 +267,82 @@
   }
   .object-spec span b{ color: var(--ink); font-weight: 500; margin-right: 12px; }
 
+  /* ——— LIVE TEXT-TO-IMAGE (pollinations.ai) ——— */
+  .live-canvas{
+    background: rgba(10,10,10,0.06);
+    overflow: hidden;
+    border-radius: 2px;
+  }
+  html[data-theme="night"] .live-canvas{ background: rgba(242,241,236,0.04); }
+  .live-canvas::after{ display: none; } /* geen shadow onder dit blok */
+  .live-img{
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 500ms ease;
+    pointer-events: none;
+  }
+  .live-img.loaded{ opacity: 1; }
+  .live-placeholder{
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink);
+    opacity: 0.32;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 300ms;
+    white-space: nowrap;
+  }
+  .live-placeholder.hidden{ opacity: 0; }
+  .live-spinner{
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 26px; height: 26px;
+    margin: -13px 0 0 -13px;
+    border-radius: 50%;
+    border: 1.5px solid var(--ink);
+    border-top-color: transparent;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms;
+  }
+  .live-spinner.active{
+    opacity: 0.55;
+    animation: live-spin 0.9s linear infinite;
+  }
+  @keyframes live-spin{
+    from{ transform: rotate(0deg); }
+    to  { transform: rotate(360deg); }
+  }
+  .live-form{
+    margin-top: 28px;
+  }
+  .live-input{
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px 18px;
+    background: transparent;
+    border: 1px solid rgba(10,10,10,0.18);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    letter-spacing: .02em;
+    outline: none;
+    transition: border-color 200ms;
+    border-radius: 2px;
+  }
+  html[data-theme="night"] .live-input{
+    border-color: rgba(242,241,236,0.2);
+  }
+  .live-input:focus{ border-color: var(--ink); }
+  .live-input::placeholder{ color: var(--ink); opacity: .4; }
+
   /* ——— OVER MIJ ——— */
   #about{
     padding-top: 160px; padding-bottom: 160px;
@@ -551,17 +627,24 @@
     </div>
   </div>
 
-  <div class="object-row" data-obj="browser">
-    <div class="object-stage" data-stage="browser"></div>
+  <div class="object-row" data-obj="livegen">
+    <div class="object-stage live-canvas" id="liveCanvas">
+      <img class="live-img" id="liveImg" alt="" />
+      <div class="live-placeholder" id="livePlaceholder">typ iets om te beginnen</div>
+      <div class="live-spinner" id="liveSpinner"></div>
+    </div>
     <div class="object-info">
       <div class="object-index">003 / 005 — web · design</div>
       <h3 class="object-name">Schermen met ritme.</h3>
-      <p class="object-desc">Een browservenster, in 3D. Binnenin scrolt een miniatuur-interface — precies zoals ik hem zou bouwen: rustig, typografisch, met één idee per scherm.</p>
+      <p class="object-desc">Een leeg canvas dat invult terwijl jij typt. Tekst → beeld, live, zonder login of knop. Probeer het: een strakke kamer, een robot in de regen, een landschap van metaal.</p>
       <div class="object-spec">
-        <span><b>stack</b> html · css · js</span>
-        <span><b>tooling</b> figma · cursor</span>
-        <span><b>principe</b> minder</span>
+        <span><b>model</b> stable diffusion · stablehorde.net</span>
+        <span><b>input</b> tekst → beeld</span>
+        <span><b>wacht</b> ~30-90s (afhankelijk van queue)</span>
       </div>
+      <form class="live-form" id="liveForm" autocomplete="off">
+        <input type="text" class="live-input" id="livePrompt" placeholder="typ een prompt..." maxlength="200" />
+      </form>
     </div>
   </div>
 
@@ -1322,16 +1405,16 @@
 
   /* ——— OBJECT FACTORIES ——— */
 
-  // 1) Bambu Lab printer — enclosed cube with moving head + growing print
-  function printer(){
+  // 1) Bambu Lab printer — enclosed cube, rack van 4 kleur-rollen erboven,
+  //    klik op rol → filament wisselt, lagen krijgen die kleur
+  function printer(stage, camera){
     const group = new THREE.Group();
     const mat = matteMat();
     const W = 1.5, H = 1.6;
 
     // Enclosure frame (wireframe)
     const frameGeo = new THREE.BoxGeometry(W, H, W);
-    const frameEdges = new THREE.EdgesGeometry(frameGeo);
-    const frameLines = new THREE.LineSegments(frameEdges, lineMat());
+    const frameLines = new THREE.LineSegments(new THREE.EdgesGeometry(frameGeo), lineMat());
     frameLines.material.transparent = true;
     frameLines.material.opacity = 0.65;
     group.add(frameLines);
@@ -1349,14 +1432,13 @@
     const bed = new THREE.Mesh(new THREE.BoxGeometry(W*0.82, 0.04, W*0.82), mat);
     bed.position.y = bedY;
     group.add(bed);
-    const bedEdges = new THREE.EdgesGeometry(bed.geometry);
-    const bedLine = new THREE.LineSegments(bedEdges, lineMat());
+    const bedLine = new THREE.LineSegments(new THREE.EdgesGeometry(bed.geometry), lineMat());
     bedLine.position.copy(bed.position);
     bedLine.material.transparent = true;
     bedLine.material.opacity = 0.3;
     group.add(bedLine);
 
-    // Gantry rail (X-axis, along the top)
+    // Gantry rail
     const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, W*0.88, 10), mat);
     rail.rotation.z = Math.PI/2;
     rail.position.y = H/2 - 0.18;
@@ -1366,7 +1448,6 @@
     const headGroup = new THREE.Group();
     headGroup.position.y = H/2 - 0.18;
     group.add(headGroup);
-
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.24), mat);
     headGroup.add(head);
     const headEdges = new THREE.LineSegments(new THREE.EdgesGeometry(head.geometry), lineMat());
@@ -1374,55 +1455,141 @@
     headEdges.material.opacity = 0.4;
     headGroup.add(headEdges);
 
-    // Nozzle
-    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 12), mat);
+    // Nozzle — kleur volgt huidig filament
+    const nozzleMat = new THREE.MeshBasicMaterial({ color: 0xf4f2ea });
+    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 12), nozzleMat);
     nozzle.position.y = -0.16;
     nozzle.rotation.x = Math.PI;
     headGroup.add(nozzle);
 
-    // Filament spool holder on side (little cylinder)
-    const spool = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.045, 10, 22), mat);
-    spool.position.set(-W/2 - 0.12, H/2 - 0.35, 0);
-    spool.rotation.y = Math.PI/2;
-    group.add(spool);
+    // === Filament rack boven de printer ===
+    const rackY = H/2 + 0.36;
 
-    // The print growing on the bed — 20 layers forming a simple vase
+    // Horizontale rek-staaf
+    const rackBar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, W*1.04, 12),
+      mat
+    );
+    rackBar.rotation.z = Math.PI/2;
+    rackBar.position.y = rackY;
+    group.add(rackBar);
+
+    // Steunen van rek naar printer-top
+    [-W*0.48, W*0.48].forEach(sx => {
+      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.04), mat);
+      strut.position.set(sx, rackY - 0.13, 0);
+      group.add(strut);
+    });
+
+    // 4 rollen
+    const FILAMENTS = [
+      { name: 'white', color: 0xf4f2ea },
+      { name: 'black', color: 0x1a1a18 },
+      { name: 'blue',  color: 0x2563eb },
+      { name: 'red',   color: 0xdc2626 },
+    ];
+    const spools = [];
+    const SPOOL_R = 0.14, SPOOL_TUBE = 0.05;
+    const totalW = W * 0.88;
+    FILAMENTS.forEach((f, i) => {
+      const x = -totalW/2 + (i + 0.5) * (totalW / FILAMENTS.length);
+      const spoolMat = new THREE.MeshBasicMaterial({ color: f.color });
+      const spool = new THREE.Mesh(
+        new THREE.TorusGeometry(SPOOL_R, SPOOL_TUBE, 12, 32),
+        spoolMat
+      );
+      spool.rotation.y = Math.PI/2;
+      spool.position.set(x, rackY, 0);
+      spool.userData = { filament: f, spoolMat, pulseT: 0 };
+      group.add(spool);
+      spools.push(spool);
+    });
+
+    // Huidig gekozen filament
+    let currentFilament = FILAMENTS[0];
+    nozzleMat.color.setHex(currentFilament.color);
+
+    // === Printlagen met individueel materiaal (zodat we per laag een kleur kunnen vastleggen) ===
     const printGroup = new THREE.Group();
     printGroup.position.y = bedY + 0.02;
     group.add(printGroup);
 
     const LAYERS = 20;
     const LH = 0.028;
+    const layerMats = [];
+    const wasVisible = new Array(LAYERS).fill(false);
     for (let i=0; i<LAYERS; i++){
       const t = i / (LAYERS-1);
       const r = 0.22 - Math.abs(t - 0.45) * 0.08;
-      const layer = new THREE.Mesh(new THREE.CylinderGeometry(r, r, LH, 28), mat);
+      const m = new THREE.MeshBasicMaterial({ color: currentFilament.color });
+      layerMats.push(m);
+      const layer = new THREE.Mesh(new THREE.CylinderGeometry(r, r, LH, 28), m);
       layer.position.y = i * LH + LH/2;
       layer.visible = false;
       printGroup.add(layer);
     }
 
-    // Animation: head wiggles, layers appear, then cycle
+    // === Click-detection op rollen via raycaster ===
+    const raycaster = new THREE.Raycaster();
+    const pointerVec = new THREE.Vector2();
+    stage.addEventListener('pointerdown', (e) => {
+      if (!camera) return;
+      const rect = stage.getBoundingClientRect();
+      pointerVec.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointerVec.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointerVec, camera);
+      const hits = raycaster.intersectObjects(spools);
+      if (hits.length > 0){
+        const hit = hits[0].object;
+        currentFilament = hit.userData.filament;
+        nozzleMat.color.setHex(currentFilament.color);
+        hit.userData.pulseT = 0.45;
+      }
+    });
+
+    // Animatie
+    let frameLastT = null;
     group.userData.onUpdate = (t) => {
-      const CYCLE = 14; // seconds per full print
+      // Scene niet auto-spinnen — rollen moeten klikbaar blijven
+      group.rotation.x = 0;
+      group.rotation.y = 0;
+
+      const CYCLE = 14;
       const p = (t % CYCLE) / CYCLE;
       const currentLayer = Math.floor(p * LAYERS);
 
-      for (let i=0; i<printGroup.children.length; i++){
-        printGroup.children[i].visible = i <= currentLayer;
+      for (let i=0; i<LAYERS; i++){
+        const visible = i <= currentLayer;
+        const layer = printGroup.children[i];
+        // Nieuwe laag verschijnt → leg huidige filamentkleur vast
+        if (visible && !wasVisible[i]){
+          layerMats[i].color.setHex(currentFilament.color);
+        }
+        layer.visible = visible;
+        wasVisible[i] = visible;
       }
 
-      // Head follows top of current layer
+      // Toolhead volgt bovenkant van de print
       const targetY = bedY + 0.04 + currentLayer * LH + 0.18;
       headGroup.position.y = targetY;
-
-      // X/Z wiggle to suggest printing motion
       const fast = t * 5.5;
       headGroup.position.x = Math.sin(fast) * 0.22;
       headGroup.position.z = Math.cos(fast * 1.4) * 0.17;
+
+      // Pulse-animatie bij click
+      const dt = frameLastT === null ? 0 : Math.min(0.05, t - frameLastT);
+      frameLastT = t;
+      spools.forEach(s => {
+        if (s.userData.pulseT > 0){
+          s.userData.pulseT = Math.max(0, s.userData.pulseT - dt);
+          s.scale.setScalar(1 + s.userData.pulseT * 0.4);
+        } else if (s.scale.x !== 1){
+          s.scale.setScalar(1);
+        }
+      });
     };
 
-    group.scale.setScalar(1.05);
+    group.scale.setScalar(0.95);
     return group;
   }
 
@@ -1794,7 +1961,7 @@
   document.querySelectorAll('[data-stage]').forEach(stage=>{
     const key = stage.dataset.stage;
     const {scene, camera, renderer} = setupScene(stage);
-    const obj = factories[key](stage);
+    const obj = factories[key](stage, camera);
     scene.add(obj);
 
     // State
@@ -2033,6 +2200,194 @@ function playTick(key){
       pos = e.code === code[0] ? 1 : 0;
     }
   });
+})();
+
+/* =========================================================
+   LIVE TEXT-TO-IMAGE — Stable Horde (free, anonymous)
+   Submit → poll status → show result URL
+   ========================================================= */
+(()=>{
+  const input = document.getElementById('livePrompt');
+  const img = document.getElementById('liveImg');
+  const placeholder = document.getElementById('livePlaceholder');
+  const spinner = document.getElementById('liveSpinner');
+  const form = document.getElementById('liveForm');
+  if (!input || !img) return;
+
+  const HORDE = 'https://stablehorde.net/api/v2';
+  const HORDE_KEY = '0000000000'; // anonymous
+  const CLIENT_AGENT = 'markhultink.com:1.0:mark';
+
+  let debounceT = null;
+  let lastRequested = '';
+  let currentGenId = 0; // increments per request — older requests abort themselves
+
+  function setStatus(text){
+    placeholder.textContent = text;
+    placeholder.classList.remove('hidden');
+  }
+  function clearStatus(){
+    placeholder.classList.add('hidden');
+  }
+
+  async function generate(prompt){
+    if (!prompt || prompt === lastRequested) return;
+    lastRequested = prompt;
+    const myId = ++currentGenId;
+
+    img.classList.remove('loaded');
+    spinner.classList.add('active');
+    setStatus('in de wachtrij...');
+
+    let jobId;
+    try {
+      const submit = await fetch(HORDE + '/generate/async', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': HORDE_KEY,
+          'Client-Agent': CLIENT_AGENT,
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          params: {
+            width: 512, height: 512,
+            steps: 20, cfg_scale: 7,
+            sampler_name: 'k_euler_a',
+            n: 1,
+          },
+          nsfw: false,
+          censor_nsfw: true,
+          r2: true,
+          models: ['stable_diffusion'],
+        }),
+      });
+      if (myId !== currentGenId) return; // superseded
+      if (!submit.ok){
+        const errText = await submit.text();
+        throw new Error('submit ' + submit.status + ': ' + errText.substring(0,120));
+      }
+      const body = await submit.json();
+      jobId = body.id;
+      if (!jobId) throw new Error('geen job-id ontvangen');
+    } catch (e){
+      if (myId !== currentGenId) return;
+      spinner.classList.remove('active');
+      setStatus('fout bij starten — probeer opnieuw');
+      return;
+    }
+
+    // Poll status
+    const start = Date.now();
+    const TIMEOUT = 180000; // 3 min
+    let pollFails = 0;
+    while (Date.now() - start < TIMEOUT){
+      if (myId !== currentGenId) return; // superseded
+      await new Promise(r => setTimeout(r, 2500));
+      if (myId !== currentGenId) return;
+
+      let check;
+      try {
+        check = await fetch(HORDE + '/generate/check/' + jobId, {
+          headers: { 'Client-Agent': CLIENT_AGENT },
+        });
+      } catch(e){
+        pollFails++;
+        if (pollFails > 3){
+          spinner.classList.remove('active');
+          setStatus('verbinding verbroken');
+          return;
+        }
+        continue;
+      }
+      if (!check.ok){
+        pollFails++;
+        if (pollFails > 3){
+          spinner.classList.remove('active');
+          setStatus('status-fout');
+          return;
+        }
+        continue;
+      }
+      const st = await check.json();
+      if (st.faulted){
+        spinner.classList.remove('active');
+        setStatus('worker faalde');
+        return;
+      }
+      if (st.done){
+        // Fetch final image URL
+        try {
+          const finalRes = await fetch(HORDE + '/generate/status/' + jobId, {
+            headers: { 'Client-Agent': CLIENT_AGENT },
+          });
+          const finalData = await finalRes.json();
+          if (myId !== currentGenId) return;
+          const gen = (finalData.generations || [])[0];
+          if (!gen || !gen.img){
+            spinner.classList.remove('active');
+            setStatus('geen beeld ontvangen');
+            return;
+          }
+          img.onload = () => {
+            if (myId !== currentGenId) return;
+            spinner.classList.remove('active');
+            clearStatus();
+            img.classList.add('loaded');
+          };
+          img.onerror = () => {
+            if (myId !== currentGenId) return;
+            spinner.classList.remove('active');
+            setStatus('beeld niet geladen');
+          };
+          img.src = gen.img;
+          return;
+        } catch(e){
+          spinner.classList.remove('active');
+          setStatus('fout bij ophalen beeld');
+          return;
+        }
+      }
+
+      // Still waiting — update status text
+      if (typeof st.wait_time === 'number' && st.wait_time >= 0){
+        setStatus('~' + st.wait_time + 's wachten (positie ' + (st.queue_position ?? '?') + ')');
+      } else if (st.processing > 0){
+        setStatus('bezig met renderen...');
+      } else {
+        setStatus('in de wachtrij...');
+      }
+    }
+
+    if (myId === currentGenId){
+      spinner.classList.remove('active');
+      setStatus('timeout — horde is druk, probeer opnieuw');
+    }
+  }
+
+  input.addEventListener('input', () => {
+    const v = input.value.trim();
+    if (!v){
+      clearTimeout(debounceT);
+      ++currentGenId; // cancel in-flight
+      lastRequested = '';
+      img.classList.remove('loaded');
+      spinner.classList.remove('active');
+      setStatus('typ iets om te beginnen');
+      return;
+    }
+    clearTimeout(debounceT);
+    debounceT = setTimeout(() => generate(v), 1000);
+  });
+
+  if (form){
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      clearTimeout(debounceT);
+      const v = input.value.trim();
+      if (v) generate(v);
+    });
+  }
 })();
 
 </script>
