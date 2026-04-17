@@ -192,24 +192,36 @@
   /* ——— LP player ——— */
   .lp{
     position: relative;
-    width: 200px;
-    height: 112px;
-    margin: 78px auto 0;
+    width: 220px;
+    height: 124px;
+    margin: 84px auto 0;
     pointer-events: none;
+  }
+  /* Grey deck under the black vinyl */
+  .lp-deck{
+    position: absolute;
+    inset: 0;
+    background: rgba(130, 130, 130, 0.14);
+    border: 1px solid rgba(130, 130, 130, 0.32);
+    border-radius: 6px;
+  }
+  html[data-theme="night"] .lp-deck{
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.14);
   }
   .lp-platter{
     position: absolute;
-    left: 0; top: 0;
-    width: 112px; height: 112px;
+    left: 8px; top: 8px;
+    width: 108px; height: 108px;
     border-radius: 50%;
     background:
-      radial-gradient(circle, transparent 14px, var(--ink) 15px, var(--ink) 16px, transparent 17px),
-      radial-gradient(circle, transparent 22px, var(--ink) 23px, var(--ink) 23.5px, transparent 24.5px),
-      radial-gradient(circle, transparent 30px, var(--ink) 31px, var(--ink) 31.5px, transparent 32.5px),
-      radial-gradient(circle, transparent 38px, var(--ink) 39px, var(--ink) 39.5px, transparent 40.5px),
-      radial-gradient(circle, transparent 46px, var(--ink) 47px, var(--ink) 47.5px, transparent 48.5px),
+      radial-gradient(circle, transparent 14px, var(--ink) 15px, var(--ink) 15.5px, transparent 16.5px),
+      radial-gradient(circle, transparent 22px, var(--ink) 22.5px, var(--ink) 23px, transparent 24px),
+      radial-gradient(circle, transparent 30px, var(--ink) 30.5px, var(--ink) 31px, transparent 32px),
+      radial-gradient(circle, transparent 38px, var(--ink) 38.5px, var(--ink) 39px, transparent 40px),
+      radial-gradient(circle, transparent 46px, var(--ink) 46.5px, var(--ink) 47px, transparent 48px),
       radial-gradient(circle, var(--ink) 50%, transparent 50%);
-    opacity: 0.85;
+    opacity: 0.92;
     transition: transform 0.4s ease-out;
   }
   .lp.is-playing .lp-platter{
@@ -219,8 +231,8 @@
   .lp-label{
     position: absolute;
     left: 50%; top: 50%;
-    width: 34px; height: 34px;
-    margin: -17px 0 0 -17px;
+    width: 32px; height: 32px;
+    margin: -16px 0 0 -16px;
     border-radius: 50%;
     background: var(--bg);
     border: 1px solid var(--ink);
@@ -231,62 +243,40 @@
     width: 3px; height: 3px;
     margin: -1.5px 0 0 -1.5px;
     border-radius: 50%;
-    background: var(--bg);
-    border: 1px solid var(--ink);
+    background: var(--ink);
   }
 
-  /* Tonearm: pivot at right side, arm extends to the left */
+  /* Tonearm: pivot at mount (right side of deck), arm extends to the LEFT onto record */
   .lp-arm-mount{
     position: absolute;
-    right: 22px; top: 8px;
-    width: 10px; height: 10px;
+    right: 20px; top: 14px;
+    width: 12px; height: 12px;
     border: 1.5px solid var(--ink);
     border-radius: 50%;
     background: var(--bg);
+    z-index: 2;
   }
   .lp-arm{
     position: absolute;
-    left: 5px; top: 50%;
-    width: 86px; height: 2px;
+    right: 6px;           /* near center of mount */
+    top: 50%;
+    width: 92px;          /* reaches onto the platter when lowered */
+    height: 2px;
     margin-top: -1px;
     background: var(--ink);
-    transform-origin: 0 50%;
-    transform: rotate(calc(-24deg + var(--arm-angle, 0deg)));
+    transform-origin: 100% 50%;  /* pivot at the RIGHT end (mount side) */
+    transform: rotate(calc(-26deg + var(--arm-angle, 0deg)));
     transition: transform 60ms linear;
-  }
-  .lp-arm::after{
-    content: '';
-    position: absolute;
-    left: -2px; top: -3px;
-    width: 4px; height: 8px;
-    background: var(--ink);
   }
   .lp-arm-head{
     position: absolute;
-    right: -6px; top: -4px;
-    width: 12px; height: 10px;
+    left: -2px; top: -4px;   /* at the tip (left end) */
+    width: 10px; height: 10px;
     background: var(--ink);
     border-radius: 1px;
   }
 
-  .lp-hint{
-    position: absolute;
-    left: 50%;
-    bottom: -26px;
-    transform: translateX(-50%);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-    color: var(--mute);
-    white-space: nowrap;
-    opacity: 0.7;
-    transition: opacity 400ms;
-    pointer-events: none;
-  }
-  .lp.is-playing .lp-hint{ opacity: 0; }
-
-  /* SVG string line — spans full hero-inner */
+  /* SVG string — path from tonearm mount up to a knot around the H */
   .lp-string{
     position: absolute;
     inset: 0;
@@ -294,12 +284,20 @@
     height: 100%;
     pointer-events: none;
     overflow: visible;
+    z-index: 3;
   }
-  .lp-string line{
+  .lp-string path{
     stroke: var(--ink);
     stroke-width: 1;
     stroke-linecap: round;
-    opacity: 0.5;
+    opacity: 0.55;
+    fill: none;
+  }
+  .lp-string circle{
+    stroke: var(--ink);
+    stroke-width: 1.2;
+    opacity: 0.75;
+    fill: none;
   }
 
   .hero-meta{
@@ -848,6 +846,7 @@
     <h1 class="hero-name" id="heroName" aria-label="Mark Hultink"></h1>
     <div class="hero-tag" id="heroTag"><span id="heroTagText"></span><span class="caret"></span></div>
     <div class="lp" id="lp" aria-hidden="true">
+      <div class="lp-deck"></div>
       <div class="lp-platter" id="lpPlatter">
         <div class="lp-label"></div>
         <div class="lp-hole"></div>
@@ -857,10 +856,10 @@
           <div class="lp-arm-head"></div>
         </div>
       </div>
-      <div class="lp-hint" id="lpHint">sleep de H naar beneden</div>
     </div>
     <svg class="lp-string" id="lpString" aria-hidden="true">
-      <line id="lpStringLine" x1="0" y1="0" x2="0" y2="0"></line>
+      <path id="lpStringPath" fill="none"></path>
+      <circle id="lpStringKnot" cx="0" cy="0" r="4" fill="none"></circle>
     </svg>
   </div>
   <div class="hero-meta hero-sprite">
@@ -2700,8 +2699,9 @@ function playTick(key){
     const arm = document.getElementById('lpArm');
     const armMount = document.getElementById('lpArmMount');
     const stringSvg = document.getElementById('lpString');
-    const stringLine = document.getElementById('lpStringLine');
-    if (!H || !lp || !arm || !stringLine) {
+    const stringPath = document.getElementById('lpStringPath');
+    const stringKnot = document.getElementById('lpStringKnot');
+    if (!H || !lp || !arm || !stringPath || !stringKnot) {
       setTimeout(init, 200);
       return;
     }
@@ -2906,15 +2906,27 @@ function playTick(key){
       const heroRect = hero.getBoundingClientRect();
       const hRect = H.getBoundingClientRect();
       const mRect = armMount.getBoundingClientRect();
-      // Anchor points in hero-local coords
-      const hx = (hRect.left + hRect.width / 2) - heroRect.left;
-      const hy = hRect.bottom - heroRect.top - 4;
+      // Knot sits on the H's crossbar (middle of the letter vertically and horizontally)
+      const kx = (hRect.left + hRect.width / 2) - heroRect.left;
+      const ky = (hRect.top + hRect.height * 0.5) - heroRect.top;
+      stringKnot.setAttribute('cx', kx);
+      stringKnot.setAttribute('cy', ky);
+
+      // String path starts at the bottom of the knot circle, curves down to the tonearm mount
+      const knotR = 4;
+      const startX = kx;
+      const startY = ky + knotR + 0.5;
       const mx = (mRect.left + mRect.width / 2) - heroRect.left;
       const my = (mRect.top + mRect.height / 2) - heroRect.top;
-      stringLine.setAttribute('x1', hx);
-      stringLine.setAttribute('y1', hy);
-      stringLine.setAttribute('x2', mx);
-      stringLine.setAttribute('y2', my);
+      // Control point that sags slightly for natural drape
+      const dx = mx - startX;
+      const dy = my - startY;
+      const ctrlX = startX + dx * 0.55;
+      const ctrlY = startY + dy * 0.35 + 18;  // sag
+      stringPath.setAttribute('d',
+        'M ' + startX + ' ' + startY +
+        ' Q ' + ctrlX + ' ' + ctrlY + ' ' + mx + ' ' + my
+      );
     }
 
     // ——— Drag handlers ———
