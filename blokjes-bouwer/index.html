@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#87ceeb">
+<title>Blokjes Bouwer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    touch-action: none;
+    background: linear-gradient(180deg, #87ceeb 0%, #b5e2f5 55%, #e4f3fb 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  canvas { display: block; touch-action: none; }
+
+  #ui {
+    position: fixed; top: max(16px, env(safe-area-inset-top));
+    left: 16px; right: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    pointer-events: none; z-index: 10;
+  }
+  .pill {
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    padding: 10px 18px; border-radius: 999px;
+    font-weight: 600; font-size: 15px; color: #2a3548;
+    box-shadow: 0 4px 14px rgba(40,60,90,0.12);
+    pointer-events: auto; border: none;
+    transition: transform 0.1s;
+  }
+  #reset:active { transform: scale(0.94); }
+
+  #hint {
+    position: fixed; bottom: max(24px, env(safe-area-inset-bottom));
+    left: 50%; transform: translateX(-50%);
+    background: rgba(20,30,50,0.65);
+    color: white; padding: 11px 20px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; z-index: 10;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: opacity 0.6s, transform 0.6s;
+    pointer-events: none; white-space: nowrap;
+  }
+  #hint.hidden { opacity: 0; transform: translate(-50%, 20px); }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="counter" class="pill">🟩 1 blokje</div>
+  <button id="reset" class="pill">↻ Reset</button>
+</div>
+<div id="hint">👆 Tik = bouwen · Rechtsklik of lang indrukken = weghalen</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---------- scene ----------
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xd7efff, 20, 55);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(5, 5, 7);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+// ---------- lights ----------
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a5a2b, 0.55));
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+const sun = new THREE.DirectionalLight(0xfff2d6, 1.05);
+sun.position.set(7, 12, 5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 50;
+sun.shadow.camera.left = -18;
+sun.shadow.camera.right = 18;
+sun.shadow.camera.top = 18;
+sun.shadow.camera.bottom = -18;
+sun.shadow.radius = 4;
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+// ---------- controls ----------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.09;
+controls.enablePan = false;
+controls.minDistance = 2.5;
+controls.maxDistance = 22;
+controls.maxPolarAngle = Math.PI * 0.52;
+controls.target.set(0, 0, 0);
+controls.update();
+
+// ---------- procedural textures ----------
+function makeCanvasTexture(size, draw) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestMipmapLinearFilter;
+  t.anisotropy = 4;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// sandy top with tufts of grass peeking through
+const topTex = makeCanvasTexture(128, (ctx, s) => {
+  const g = ctx.createLinearGradient(0, 0, s, s);
+  g.addColorStop(0, '#eed09a');
+  g.addColorStop(1, '#d8b373');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  // grains
+  for (let i = 0; i < 900; i++) {
+    const a = 0.2 + Math.random() * 0.55;
+    ctx.fillStyle = `rgba(${120 + (Math.random() * 80 | 0)},${80 + (Math.random() * 60 | 0)},${30 + (Math.random() * 40 | 0)},${a})`;
+    ctx.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  // subtle highlight specks
+  for (let i = 0; i < 120; i++) {
+    ctx.fillStyle = `rgba(255,240,200,${0.3 + Math.random() * 0.4})`;
+    ctx.fillRect(Math.random() * s, Math.random() * s, 1, 1);
+  }
+  // little grass tufts
+  for (let i = 0; i < 22; i++) {
+    ctx.fillStyle = `rgba(${70 + (Math.random() * 60 | 0)},${140 + (Math.random() * 60 | 0)},${50 + (Math.random() * 40 | 0)},0.92)`;
+    const x = Math.random() * s, y = Math.random() * s;
+    ctx.fillRect(x, y, 2, 3);
+    ctx.fillRect(x + 1, y - 2, 1, 2);
+  }
+});
+
+// grass-topped dirt side with sandy dusting
+const sideTex = makeCanvasTexture(128, (ctx, s) => {
+  // dirt base
+  const d = ctx.createLinearGradient(0, 0, 0, s);
+  d.addColorStop(0, '#74512f');
+  d.addColorStop(1, '#543822');
+  ctx.fillStyle = d; ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 500; i++) {
+    ctx.fillStyle = `rgba(${30 + (Math.random() * 70 | 0)},${20 + (Math.random() * 50 | 0)},${10 + (Math.random() * 25 | 0)},${0.25 + Math.random() * 0.6})`;
+    ctx.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  // pebbles
+  for (let i = 0; i < 30; i++) {
+    ctx.fillStyle = `rgba(${100 + (Math.random() * 60 | 0)},${80 + (Math.random() * 50 | 0)},${60 + (Math.random() * 30 | 0)},0.7)`;
+    ctx.fillRect(Math.random() * s, Math.random() * s, 2, 2);
+  }
+  // grass strip
+  const grassH = Math.floor(s * 0.26);
+  const gg = ctx.createLinearGradient(0, 0, 0, grassH);
+  gg.addColorStop(0, '#82ca4d');
+  gg.addColorStop(1, '#4f9a2f');
+  ctx.fillStyle = gg; ctx.fillRect(0, 0, s, grassH);
+  // uneven grass drip
+  for (let x = 0; x < s; x += 2) {
+    const drip = grassH + (Math.random() * 8 - 2) | 0;
+    ctx.fillStyle = Math.random() < 0.5 ? '#4f9a2f' : '#5fae3a';
+    if (drip > grassH) ctx.fillRect(x, grassH, 2, drip - grassH);
+  }
+  // sandy dusting near top
+  for (let i = 0; i < 80; i++) {
+    ctx.fillStyle = `rgba(${220 + (Math.random() * 25 | 0)},${190 + (Math.random() * 30 | 0)},${125 + (Math.random() * 30 | 0)},0.85)`;
+    ctx.fillRect(Math.random() * s, Math.random() * 7, 2, 1);
+  }
+  // grass blades on top
+  for (let i = 0; i < 50; i++) {
+    ctx.fillStyle = `rgba(${80 + (Math.random() * 60 | 0)},${160 + (Math.random() * 50 | 0)},${50 + (Math.random() * 30 | 0)},0.9)`;
+    ctx.fillRect(Math.random() * s, grassH - 2, 1, 3);
+  }
+});
+
+// dirt bottom
+const bottomTex = makeCanvasTexture(128, (ctx, s) => {
+  ctx.fillStyle = '#543822'; ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 600; i++) {
+    ctx.fillStyle = `rgba(${30 + (Math.random() * 70 | 0)},${20 + (Math.random() * 50 | 0)},${10 + (Math.random() * 25 | 0)},${0.3 + Math.random() * 0.55})`;
+    ctx.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+});
+
+// shared materials (all blocks reuse these — much lighter on GPU)
+const sharedMats = [
+  new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.95 }),   // +x
+  new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.95 }),   // -x
+  new THREE.MeshStandardMaterial({ map: topTex,  roughness: 0.9 }),    // +y top
+  new THREE.MeshStandardMaterial({ map: bottomTex, roughness: 0.95 }), // -y
+  new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.95 }),   // +z
+  new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.95 }),   // -z
+];
+
+const boxGeom = new THREE.BoxGeometry(1, 1, 1);
+
+// ---------- block bookkeeping ----------
+const blocks = new Map();
+const blockMeshes = [];
+const keyFor = (x, y, z) => `${x},${y},${z}`;
+const counterEl = document.getElementById('counter');
+function updateCounter() {
+  const n = blocks.size;
+  counterEl.textContent = `🟩 ${n} ${n === 1 ? 'blokje' : 'blokjes'}`;
+}
+
+function addBlock(x, y, z, animate = true) {
+  const k = keyFor(x, y, z);
+  if (blocks.has(k)) return null;
+  const mesh = new THREE.Mesh(boxGeom, sharedMats);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData = { gx: x, gy: y, gz: z, spawn: performance.now(), animate };
+  if (animate) mesh.scale.setScalar(0.01);
+  scene.add(mesh);
+  blocks.set(k, mesh);
+  blockMeshes.push(mesh);
+  updateCounter();
+  return mesh;
+}
+addBlock(0, 0, 0, false);
+
+// ---------- audio (procedural plop) ----------
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playPlop() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+
+  // low thump
+  const thump = audioCtx.createOscillator();
+  thump.type = 'sine';
+  thump.frequency.setValueAtTime(230, t0);
+  thump.frequency.exponentialRampToValueAtTime(55, t0 + 0.18);
+  const tg = audioCtx.createGain();
+  tg.gain.setValueAtTime(0.0001, t0);
+  tg.gain.exponentialRampToValueAtTime(0.55, t0 + 0.008);
+  tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.24);
+  thump.connect(tg).connect(audioCtx.destination);
+  thump.start(t0); thump.stop(t0 + 0.26);
+
+  // top click
+  const click = audioCtx.createOscillator();
+  click.type = 'triangle';
+  click.frequency.setValueAtTime(900 + Math.random() * 220, t0);
+  click.frequency.exponentialRampToValueAtTime(280, t0 + 0.09);
+  const cg = audioCtx.createGain();
+  cg.gain.setValueAtTime(0.0001, t0);
+  cg.gain.exponentialRampToValueAtTime(0.2, t0 + 0.005);
+  cg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.13);
+  click.connect(cg).connect(audioCtx.destination);
+  click.start(t0); click.stop(t0 + 0.15);
+
+  // noise burst for grit
+  const len = Math.floor(0.06 * audioCtx.sampleRate);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const n = audioCtx.createBufferSource();
+  n.buffer = buf;
+  const ng = audioCtx.createGain(); ng.gain.value = 0.18;
+  const filt = audioCtx.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 1100;
+  n.connect(filt).connect(ng).connect(audioCtx.destination);
+  n.start(t0);
+}
+
+// ---------- particles (sandy sprites) ----------
+const particleTex = makeCanvasTexture(32, (ctx, s) => {
+  const g = ctx.createRadialGradient(s/2, s/2, 1, s/2, s/2, s/2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.8)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+});
+const particles = [];
+function spawnParticles(x, y, z, normal) {
+  const count = 16;
+  for (let i = 0; i < count; i++) {
+    const isGrass = Math.random() < 0.35;
+    const color = isGrass
+      ? new THREE.Color(`hsl(${85 + Math.random() * 25}, 55%, ${42 + Math.random() * 14}%)`)
+      : new THREE.Color(`hsl(${38 + Math.random() * 12}, ${55 + Math.random() * 20}%, ${62 + Math.random() * 12}%)`);
+    const mat = new THREE.SpriteMaterial({ map: particleTex, color, transparent: true, depthWrite: false });
+    const sp = new THREE.Sprite(mat);
+    const size = 0.08 + Math.random() * 0.08;
+    sp.scale.setScalar(size);
+    sp.position.set(x + normal.x * 0.5, y + normal.y * 0.5, z + normal.z * 0.5);
+    const spread = 0.9;
+    const v = new THREE.Vector3(
+      normal.x * (0.9 + Math.random() * 1.3) + (Math.random() - 0.5) * spread,
+      normal.y * (0.9 + Math.random() * 1.3) + (Math.random() - 0.5) * spread + 0.5,
+      normal.z * (0.9 + Math.random() * 1.3) + (Math.random() - 0.5) * spread,
+    );
+    scene.add(sp);
+    particles.push({ sp, v, life: 0, max: 0.55 + Math.random() * 0.35, size });
+  }
+}
+
+// ---------- remove block ----------
+function playCrunch() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  // descending pop
+  const osc = audioCtx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(620 + Math.random() * 120, t0);
+  osc.frequency.exponentialRampToValueAtTime(130, t0 + 0.14);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.32, t0 + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t0); osc.stop(t0 + 0.2);
+  // crunchy noise
+  const len = Math.floor(0.13 * audioCtx.sampleRate);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const n = audioCtx.createBufferSource();
+  n.buffer = buf;
+  const ng = audioCtx.createGain(); ng.gain.value = 0.26;
+  const f = audioCtx.createBiquadFilter();
+  f.type = 'highpass'; f.frequency.value = 480;
+  n.connect(f).connect(ng).connect(audioCtx.destination);
+  n.start(t0);
+}
+
+function spawnBurstParticles(x, y, z) {
+  const count = 22;
+  for (let i = 0; i < count; i++) {
+    const isGrass = Math.random() < 0.35;
+    const color = isGrass
+      ? new THREE.Color(`hsl(${85 + Math.random() * 25}, 55%, ${42 + Math.random() * 14}%)`)
+      : new THREE.Color(`hsl(${38 + Math.random() * 12}, ${55 + Math.random() * 20}%, ${62 + Math.random() * 12}%)`);
+    const mat = new THREE.SpriteMaterial({ map: particleTex, color, transparent: true, depthWrite: false });
+    const sp = new THREE.Sprite(mat);
+    const size = 0.08 + Math.random() * 0.1;
+    sp.scale.setScalar(size);
+    sp.position.set(x, y, z);
+    // spherical burst
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const speed = 1.6 + Math.random() * 1.8;
+    const v = new THREE.Vector3(
+      Math.sin(phi) * Math.cos(theta) * speed,
+      Math.cos(phi) * speed + 0.8,
+      Math.sin(phi) * Math.sin(theta) * speed,
+    );
+    scene.add(sp);
+    particles.push({ sp, v, life: 0, max: 0.65 + Math.random() * 0.4, size });
+  }
+}
+
+function removeBlock(mesh) {
+  if (blocks.size <= 1) {
+    // can't empty the world — give a gentle wiggle instead
+    mesh.userData.reactStart = performance.now();
+    return false;
+  }
+  const { gx, gy, gz } = mesh.userData;
+  blocks.delete(keyFor(gx, gy, gz));
+  const idx = blockMeshes.indexOf(mesh);
+  if (idx !== -1) blockMeshes.splice(idx, 1);
+  scene.remove(mesh);
+  spawnBurstParticles(gx, gy, gz);
+  ensureAudio();
+  playCrunch();
+  updateCounter();
+  return true;
+}
+
+function handleRemove(cx, cy) {
+  pointer.x = (cx / innerWidth) * 2 - 1;
+  pointer.y = -(cy / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(blockMeshes, false);
+  if (!hits.length) return false;
+  return removeBlock(hits[0].object);
+}
+
+// ---------- interaction (tap vs drag) ----------
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function handleTap(cx, cy) {
+  pointer.x = (cx / innerWidth) * 2 - 1;
+  pointer.y = -(cy / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(blockMeshes, false);
+  if (!hits.length) return;
+  const hit = hits[0];
+  const n = hit.face.normal.clone();
+  const b = hit.object.userData;
+  const nx = b.gx + Math.round(n.x);
+  const ny = b.gy + Math.round(n.y);
+  const nz = b.gz + Math.round(n.z);
+  const placed = addBlock(nx, ny, nz, true);
+  if (placed) {
+    ensureAudio();
+    playPlop();
+    spawnParticles(nx - n.x * 0.5, ny - n.y * 0.5, nz - n.z * 0.5, n);
+    // squash the block being built on (little reaction)
+    hit.object.userData.reactStart = performance.now();
+    hideHint();
+  }
+}
+
+let pStart = { x: 0, y: 0, t: 0 }, moved = false;
+let longPressTimer = null, longPressFired = false;
+const DRAG_PX = 8, TAP_MS = 450, LONG_PRESS_MS = 550;
+const cv = renderer.domElement;
+
+cv.addEventListener('pointerdown', e => {
+  ensureAudio();
+  // only left-mouse / touch / pen-tip count as a "tap" — ignore right & middle click
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  pStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+  moved = false;
+  longPressFired = false;
+  // long-press = delete, for touch (and pen)
+  if (e.pointerType !== 'mouse') {
+    const cx = e.clientX, cy = e.clientY;
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      if (moved) return;
+      if (handleRemove(cx, cy)) {
+        longPressFired = true;
+        if (navigator.vibrate) navigator.vibrate(35);
+      }
+    }, LONG_PRESS_MS);
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (Math.abs(e.clientX - pStart.x) > DRAG_PX || Math.abs(e.clientY - pStart.y) > DRAG_PX) {
+    moved = true;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  }
+});
+cv.addEventListener('pointerup', e => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  // ignore right/middle mouse — those only delete via contextmenu
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (longPressFired) return;
+  if (!moved && performance.now() - pStart.t < TAP_MS) handleTap(e.clientX, e.clientY);
+});
+cv.addEventListener('pointercancel', () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+});
+
+// right-click = delete
+cv.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  handleRemove(e.clientX, e.clientY);
+});
+
+// ---------- hover face highlight (mouse only) ----------
+const hoverMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.1,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+);
+hoverMesh.renderOrder = 999;
+hoverMesh.visible = false;
+scene.add(hoverMesh);
+
+let hoverX = 0, hoverY = 0, hoverActive = false;
+const PLANE_DEFAULT_NORMAL = new THREE.Vector3(0, 0, 1);
+
+cv.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  if (e.buttons !== 0) { hoverActive = false; return; } // hide while dragging
+  hoverX = e.clientX; hoverY = e.clientY; hoverActive = true;
+});
+cv.addEventListener('pointerleave', () => { hoverActive = false; });
+cv.addEventListener('pointercancel', () => { hoverActive = false; });
+
+function updateHover() {
+  if (!hoverActive) { hoverMesh.visible = false; return; }
+  pointer.x = (hoverX / innerWidth) * 2 - 1;
+  pointer.y = -(hoverY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(blockMeshes, false);
+  if (!hits.length) { hoverMesh.visible = false; return; }
+  const hit = hits[0];
+  const n = hit.face.normal;
+  const b = hit.object.userData;
+  // position at face center, nudged out slightly to avoid z-fighting
+  const off = 0.002;
+  hoverMesh.position.set(
+    b.gx + n.x * (0.5 + off),
+    b.gy + n.y * (0.5 + off),
+    b.gz + n.z * (0.5 + off),
+  );
+  hoverMesh.quaternion.setFromUnitVectors(PLANE_DEFAULT_NORMAL, n);
+  hoverMesh.visible = true;
+}
+
+// ---------- reset ----------
+document.getElementById('reset').addEventListener('click', () => {
+  for (const m of blockMeshes) scene.remove(m);
+  blockMeshes.length = 0;
+  blocks.clear();
+  addBlock(0, 0, 0, false);
+});
+
+// ---------- hint ----------
+let hintVisible = true;
+const hintEl = document.getElementById('hint');
+function hideHint() {
+  if (!hintVisible) return;
+  hintVisible = false;
+  hintEl.classList.add('hidden');
+  setTimeout(() => hintEl.remove(), 700);
+}
+
+// ---------- resize ----------
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const now = performance.now();
+
+  // bounce-in (easeOutBack)
+  for (const m of blockMeshes) {
+    if (m.userData.animate) {
+      const age = (now - m.userData.spawn) / 1000;
+      const D = 0.45;
+      if (age >= D) {
+        m.scale.setScalar(1);
+        m.userData.animate = false;
+      } else {
+        const p = age / D;
+        const c1 = 1.70158, c3 = c1 + 1;
+        const eased = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+        m.scale.setScalar(eased);
+      }
+    }
+    // mini squash reaction on the parent block
+    if (m.userData.reactStart) {
+      const age = (now - m.userData.reactStart) / 1000;
+      const D = 0.22;
+      if (age >= D) {
+        if (!m.userData.animate) m.scale.setScalar(1);
+        m.userData.reactStart = 0;
+      } else {
+        const p = age / D;
+        const k = Math.sin(p * Math.PI) * 0.08;
+        m.scale.setScalar(1 - k);
+      }
+    }
+  }
+
+  // particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life += dt;
+    p.v.y -= 6 * dt;
+    p.sp.position.addScaledVector(p.v, dt);
+    const k = p.life / p.max;
+    p.sp.material.opacity = Math.max(0, 1 - k);
+    p.sp.scale.setScalar(p.size * (1 - k * 0.5));
+    if (p.life >= p.max) {
+      scene.remove(p.sp);
+      p.sp.material.dispose();
+      particles.splice(i, 1);
+    }
+  }
+
+  updateHover();
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
