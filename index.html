@@ -360,13 +360,12 @@
   .object-row--wide .object-info{ max-width: 760px; }
 
   .game-stage{
-    background: #050508;
-    overflow: hidden;
+    background: transparent;
+    overflow: visible;
     position: relative;
-    border: 1px solid rgba(10,10,10,0.18);
-  }
-  html[data-theme="night"] .game-stage{
-    border-color: rgba(242,241,236,0.12);
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+    padding: 0;
   }
   .game-stage canvas{
     width: 100%;
@@ -376,6 +375,112 @@
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
+  }
+  /* Counter/hall overlay — positioned over the canvas where the end wall sits */
+  .game-board{
+    position: absolute;
+    top: 30%;
+    right: 2.5%;
+    width: 14%;
+    padding: 0;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ink);
+    pointer-events: none;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .game-board__row{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 10px;
+    letter-spacing: .12em;
+  }
+  .game-board__row span{ opacity: 0.55; }
+  .game-board__row strong{ font-weight: 600; font-size: 12px; }
+  .game-board__row--fails strong{ color: #c84a46; }
+  .game-board__divider{
+    height: 1px;
+    background: var(--ink);
+    opacity: 0.25;
+    margin: 8px 0 6px;
+  }
+  .game-board__hall{
+    font-size: 10px;
+    letter-spacing: .1em;
+    min-height: 56px;
+  }
+  .game-board__hall div{
+    padding: 1px 0;
+    opacity: 0.65;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .game-board__hall div:first-child{ opacity: 1; }
+  .game-board__empty{ opacity: 0.25 !important; text-align: center; }
+
+  /* Name prompt when finish reached */
+  .game-prompt{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    z-index: 10;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);
+  }
+  .game-prompt[hidden]{ display: none; }
+  .game-prompt label{ opacity: 0.55; }
+  .game-prompt input{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--ink);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 14px;
+    letter-spacing: .05em;
+    padding: 2px 4px;
+    outline: none;
+    width: 120px;
+    text-transform: none;
+  }
+  .game-prompt button{
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: opacity 150ms;
+  }
+  .game-prompt button:hover{ opacity: 0.8; }
+
+  /* Hint at bottom of stage */
+  .game-hint{
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .16em;
+    color: var(--ink);
+    opacity: 0.35;
+    pointer-events: none;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   /* ——— OVER MIJ ——— */
@@ -691,15 +796,27 @@
   <div class="object-row object-row--wide" data-obj="prince">
     <div class="object-stage game-stage" data-game="prince">
       <canvas id="princeGame" width="480" height="200"></canvas>
+      <div class="game-board" id="gameBoard">
+        <div class="game-board__row"><span>CLEARS</span><strong id="gameClears">000</strong></div>
+        <div class="game-board__row game-board__row--fails"><span>FAILS</span><strong id="gameFails">000</strong></div>
+        <div class="game-board__divider"></div>
+        <div class="game-board__hall" id="gameHall"><div class="game-board__empty">—</div></div>
+      </div>
+      <form class="game-prompt" id="gamePrompt" hidden autocomplete="off">
+        <label>je naam?</label>
+        <input type="text" id="gameNameInput" maxlength="10" spellcheck="false" />
+        <button type="submit" aria-label="opslaan">↵</button>
+      </form>
+      <div class="game-hint">pijltjes = lopen · spatie = spring</div>
     </div>
     <div class="object-info">
       <div class="object-index">004 / 005 — games</div>
-      <h3 class="object-name">Een prins, drie obstakels.</h3>
-      <p class="object-desc">Een kleine ode aan Prince of Persia (1989). Een smal gat, een poort met spikes, en een bredere afgrond — klik of druk spatie op het juiste moment. Mis je timing, dan wachten de spikes. De eindmuur houdt bij hoe vaak je het haalt.</p>
+      <h3 class="object-name">Een prins, twee gaten.</h3>
+      <p class="object-desc">Een kleine ode aan Prince of Persia (1989). Pijltjes om te lopen, spatie om te springen. Twee afgronden met spikes, en een bord dat je naam bewaart als je het haalt — een kleine tafel van wie het gelukt is.</p>
       <div class="object-spec">
         <span><b>ode aan</b> prince of persia (1989)</span>
-        <span><b>obstakels</b> gap · poort · gap</span>
-        <span><b>input</b> klik / spatie = spring</span>
+        <span><b>besturing</b> pijltjes · spatie</span>
+        <span><b>finish</b> schrijf je naam op 't bord</span>
       </div>
     </div>
   </div>
@@ -726,10 +843,10 @@
 
   <div class="tape-wrap">
     <div class="tape" id="tape">
-      <a class="card" data-hover href="/blokjes-bouwer/" style="text-decoration:none; color:inherit; display:block;">
+      <a class="card" data-hover href="/buildingb/" target="_blank" rel="noopener" style="text-decoration:none; color:inherit; display:block;">
         <canvas class="card-pixel card-pixel--blocks" data-pixel="blocks" width="16" height="16"></canvas>
         <div class="card-meta"><span>speeltje</span><span>2025</span></div>
-        <h3 class="card-title">Blokjes Bouwer</h3>
+        <h3 class="card-title">buildingb</h3>
         <p class="card-desc">Een Minecraft-achtig speeltje in de browser. Blokjes plaatsen, blokjes slopen, geluid dat precies goed voelt. Particles doen de rest.</p>
         <div class="card-link">bekijk →</div>
       </a>
@@ -2433,7 +2550,7 @@ function playTick(key){
 })();
 
 /* =========================================================
-   PIXEL-ART PRINCE OF PERSIA HOMMAGE (2D canvas)
+   PRINCE HOMMAGE — minimal 2D, site-stijl, transparant
    ========================================================= */
 (()=>{
   const stage = document.querySelector('[data-game="prince"]');
@@ -2446,49 +2563,38 @@ function playTick(key){
   const W = canvas.width;   // 480
   const H = canvas.height;  // 200
 
-  // ——— Colors (PoP blue-stone palette) ———
-  const COL = {
-    bg:        '#05060a',
-    brickMid:  '#5c6378',
-    brickLight:'#828caa',
-    brickDark: '#3a3d4c',
-    mortar:    '#262832',
-    pitDark:   '#17191f',
-    spike:     '#edeee8',
-    spikeSh:   '#8f95a4',
-    skin:      '#dfc19a',
-    skinSh:    '#a48160',
-    robe:      '#ece9d6',
-    robeSh:    '#b3b098',
-    red:       '#c84a46',
-    redSh:     '#7d2a27',
-    darkBrown: '#231a18',
-    gate:      '#6a7088',
-    gateDark:  '#2f323e',
-  };
+  // Theme colors (from CSS variables, react to theme switch)
+  function readCol(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  let INK = readCol('--ink') || '#0a0a0a';
+  let MUTE = readCol('--mute') || '#777';
+  const RED = '#c84a46';
+  new MutationObserver(() => {
+    INK = readCol('--ink') || INK;
+    MUTE = readCol('--mute') || MUTE;
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   // ——— Level layout ———
   const GROUND_Y = 130;
-  const PIT_TOP  = H - 24;     // bottom platform floor
   const platforms = [
-    { left:   0, right:  90 }, // A start
-    { left: 135, right: 255 }, // B middle
-    { left: 325, right: 480 }, // C end
+    { left:   0, right:  90 },  // A start
+    { left: 135, right: 310 },  // B middle (no gate anymore)
+    { left: 375, right: W   },  // C end
   ];
   const gaps = [
-    { left:  90, right: 135 }, // small, ~45 wide
-    { left: 255, right: 325 }, // wide, 70
+    { left:  90, right: 135 },  // small, 45 wide
+    { left: 310, right: 375 },  // wider, 65 wide
   ];
-  // Gate (PoP portcullis) on platform B
-  const gate = { left: 190, right: 212, top: 100, bottom: GROUND_Y };
+  const finishX = platforms[2].right - 30; // trigger zone near end
 
   // ——— Prince state ———
-  const PW = 10, PH = 24;
+  const PW = 10, PH = 22;
   const state = {
     mode: 'walking',
     x: 10,
     y: GROUND_Y - PH,
-    vx: 0.65,
+    vx: 0,
     vy: 0,
     facing: 1,
     tilt: 0,
@@ -2496,194 +2602,187 @@ function playTick(key){
     clears: 0,
     fails: 0,
     animT: 0,
+    moving: false,
   };
+  const WALK_SPEED = 0.95;
+  const JUMP_VY = -3.0;
+  const JUMP_VX = 1.55;
+  const GRAVITY = 0.2;
 
   function reset(){
     state.mode = 'walking';
     state.x = 10;
     state.y = GROUND_Y - PH;
-    state.vx = 0.65;
+    state.vx = 0;
     state.vy = 0;
     state.tilt = 0;
+    state.facing = 1;
+    state.moving = false;
   }
 
+  function isInViewport(){
+    const r = stage.getBoundingClientRect();
+    return r.top < window.innerHeight && r.bottom > 0;
+  }
+
+  const keys = { left: false, right: false };
   function triggerJump(){
-    if (state.mode === 'walking'){
-      state.mode = 'jumping';
-      state.vy = -3.3;
-      state.vx = 1.7;
-    }
+    if (state.mode !== 'walking') return;
+    state.mode = 'jumping';
+    state.vy = JUMP_VY;
+    let dir = 0;
+    if (keys.right) dir = 1;
+    if (keys.left) dir = -1;
+    state.vx = dir * JUMP_VX;
   }
 
-  stage.addEventListener('pointerdown', (e) => { e.preventDefault(); triggerJump(); });
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.key === ' '){
-      const r = stage.getBoundingClientRect();
-      if (r.top < window.innerHeight && r.bottom > 0){
-        e.preventDefault();
-        triggerJump();
-      }
+    if (!isInViewport()) return;
+    if (e.code === 'ArrowLeft'){ keys.left = true; e.preventDefault(); }
+    else if (e.code === 'ArrowRight'){ keys.right = true; e.preventDefault(); }
+    else if (e.code === 'ArrowUp' || e.code === 'Space' || e.key === ' '){
+      e.preventDefault();
+      triggerJump();
     }
   });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft') keys.left = false;
+    if (e.code === 'ArrowRight') keys.right = false;
+  });
 
-  // Deterministic pseudo-random for brick speckles
-  function hash(x, y){
-    let h = (x * 73856093) ^ (y * 19349663);
-    h = (h ^ (h >>> 13)) * 1274126177;
-    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  // Click on stage = jump (but not when clicking inside the name prompt)
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.game-prompt')) return;
+    triggerJump();
+  });
+
+  // ——— Hall of fame (localStorage) ———
+  const HALL_KEY = 'mh_prince_hall';
+  let hall = [];
+  try { hall = JSON.parse(localStorage.getItem(HALL_KEY) || '[]'); } catch(e) {}
+  if (!Array.isArray(hall)) hall = [];
+
+  const clearsEl = document.getElementById('gameClears');
+  const failsEl  = document.getElementById('gameFails');
+  const hallEl   = document.getElementById('gameHall');
+  const promptEl = document.getElementById('gamePrompt');
+  const inputEl  = document.getElementById('gameNameInput');
+
+  function esc(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function renderBoard(){
+    if (clearsEl) clearsEl.textContent = String(state.clears).padStart(3, '0');
+    if (failsEl)  failsEl.textContent  = String(state.fails).padStart(3, '0');
+    if (hallEl){
+      hallEl.innerHTML = hall.length
+        ? hall.map(n => '<div>» ' + esc(n) + '</div>').join('')
+        : '<div class="game-board__empty">—</div>';
+    }
   }
+  renderBoard();
 
-  // ——— Drawing helpers ———
-
-  function drawBricks(x0, y0, w, h, opts){
-    opts = opts || {};
-    const bw = 16, bh = 10, mortar = 1;
-    ctx.fillStyle = COL.mortar;
-    ctx.fillRect(x0, y0, w, h);
-    const rows = Math.ceil(h / bh) + 1;
-    for (let ry = 0; ry < rows; ry++){
-      const y = y0 + ry * bh;
-      if (y >= y0 + h) break;
-      const offset = (ry % 2) * (bw / 2);
-      const cols = Math.ceil(w / bw) + 2;
-      for (let rx = -1; rx < cols; rx++){
-        const bx = x0 + rx * bw - offset;
-        const cx = Math.max(bx, x0);
-        const cy = Math.max(y, y0);
-        const cw = Math.min(bx + bw - mortar, x0 + w) - cx;
-        const ch = Math.min(y + bh - mortar, y0 + h) - cy;
-        if (cw <= 0 || ch <= 0) continue;
-        // Brick body
-        ctx.fillStyle = opts.dark ? COL.pitDark : COL.brickMid;
-        ctx.fillRect(cx, cy, cw, ch);
-        if (!opts.dark){
-          // top highlight
-          ctx.fillStyle = COL.brickLight;
-          ctx.fillRect(cx, cy, cw, 1);
-          // bottom shadow
-          ctx.fillStyle = COL.brickDark;
-          ctx.fillRect(cx, cy + ch - 1, cw, 1);
-          // speckles
-          const r1 = hash(bx|0, y|0);
-          if (r1 > 0.7){
-            ctx.fillStyle = COL.brickDark;
-            ctx.fillRect(cx + Math.floor(r1 * cw), cy + Math.floor(hash(bx*2|0, y*3|0) * ch), 1, 1);
-          }
-          const r2 = hash(bx|0, y*5|0);
-          if (r2 > 0.85){
-            ctx.fillStyle = COL.brickLight;
-            ctx.fillRect(cx + Math.floor(r2 * cw), cy + 1, 1, 1);
-          }
+  function showPrompt(){
+    if (!promptEl) return;
+    promptEl.hidden = false;
+    setTimeout(() => { if (inputEl){ inputEl.value = ''; inputEl.focus(); } }, 40);
+  }
+  function hidePrompt(){
+    if (!promptEl) return;
+    promptEl.hidden = true;
+    if (inputEl) inputEl.blur();
+  }
+  function saveName(name){
+    name = (name || '').trim().slice(0, 10);
+    if (name){
+      hall.unshift(name);
+      hall = hall.slice(0, 6);
+      try { localStorage.setItem(HALL_KEY, JSON.stringify(hall)); } catch(e){}
+      renderBoard();
+    }
+  }
+  if (promptEl){
+    promptEl.addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveName(inputEl && inputEl.value);
+      hidePrompt();
+      state.mode = 'resetting';
+      state.phaseT = performance.now();
+    });
+    if (inputEl){
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape'){
+          hidePrompt();
+          state.mode = 'resetting';
+          state.phaseT = performance.now();
         }
-      }
+        e.stopPropagation();
+      });
     }
   }
 
-  function drawSpikeRow(x0, x1, y, tipsUp){
-    // Row of spikes between x0..x1; base line at y
-    const spikeW = 5;
-    const spikeH = 7;
-    for (let x = x0; x + spikeW <= x1; x += spikeW){
-      // left dark half
-      ctx.fillStyle = COL.spikeSh;
-      for (let r = 0; r < spikeH; r++){
-        const wPx = Math.max(1, spikeW - Math.floor(r * spikeW / spikeH));
-        const dy = tipsUp ? -r : r;
-        ctx.fillRect(x + Math.floor((spikeW - wPx)/2), y + dy - (tipsUp ? 0 : 1), wPx, 1);
-      }
-      // right bright half overlay
-      ctx.fillStyle = COL.spike;
-      for (let r = 0; r < spikeH; r++){
-        const wPx = Math.max(1, spikeW - Math.floor(r * spikeW / spikeH));
-        if (wPx < 2) continue;
-        const dy = tipsUp ? -r : r;
-        ctx.fillRect(x + Math.floor((spikeW - wPx)/2), y + dy - (tipsUp ? 0 : 1), wPx - 1, 1);
-      }
+  // ——— Drawing (minimal, site palette) ———
+
+  function drawPlatform(p){
+    const w = p.right - p.left;
+    const h = H - GROUND_Y;
+    ctx.fillStyle = INK;
+    ctx.globalAlpha = 0.06;
+    ctx.fillRect(p.left, GROUND_Y, w, h);
+    ctx.globalAlpha = 1;
+    // Top edge
+    ctx.fillRect(p.left, GROUND_Y, w, 1);
+    // Side edges
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(p.left, GROUND_Y, 1, h);
+    ctx.fillRect(p.right - 1, GROUND_Y, 1, h);
+    ctx.globalAlpha = 1;
+    // Subtle brick-like tick marks on top surface
+    ctx.globalAlpha = 0.25;
+    for (let i = 8; i < w - 4; i += 12){
+      ctx.fillRect(p.left + i, GROUND_Y + 1, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSpikes(x0, x1, y){
+    ctx.fillStyle = INK;
+    const sW = 5, sH = 7;
+    for (let x = x0; x + sW <= x1; x += sW){
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + sW, y);
+      ctx.lineTo(x + sW/2, y - sH);
+      ctx.closePath();
+      ctx.fill();
     }
   }
 
-  function drawGate(){
-    // Stone arch block (wider than the gate area)
-    const archLeft = gate.left - 4;
-    const archRight = gate.right + 4;
-    const archTop = gate.top - 10;
-    const archW = archRight - archLeft;
-
-    // Stone frame top
-    drawBricks(archLeft, archTop, archW, 10);
-    // Side pillars inside platform B (thin stone)
-    ctx.fillStyle = COL.brickMid;
-    ctx.fillRect(gate.left - 2, gate.top, 4, gate.bottom - gate.top);
-    ctx.fillRect(gate.right - 2, gate.top, 4, gate.bottom - gate.top);
-    ctx.fillStyle = COL.brickLight;
-    ctx.fillRect(gate.left - 2, gate.top, 1, gate.bottom - gate.top);
-    ctx.fillRect(gate.right - 2, gate.top, 1, gate.bottom - gate.top);
-    ctx.fillStyle = COL.brickDark;
-    ctx.fillRect(gate.left + 1, gate.top, 1, gate.bottom - gate.top);
-    ctx.fillRect(gate.right + 1, gate.top, 1, gate.bottom - gate.top);
-
-    // Gate bars hanging down (portcullis)
-    const innerLeft = gate.left + 3;
-    const innerRight = gate.right - 3;
-    const innerW = innerRight - innerLeft;
-    const barCount = 6;
-    const barSpacing = innerW / (barCount - 1);
-    const barTop = gate.top + 1;
-    const barBottom = gate.bottom - 2;
-    for (let i = 0; i < barCount; i++){
-      const bx = Math.round(innerLeft + i * barSpacing);
-      ctx.fillStyle = COL.gateDark;
-      ctx.fillRect(bx, barTop, 1, barBottom - barTop);
-      ctx.fillStyle = COL.gate;
-      ctx.fillRect(bx, barTop, 1, 2); // highlight top
-      // Spike at bottom of bar
-      ctx.fillStyle = COL.spike;
-      ctx.fillRect(bx, barBottom - 1, 1, 1);
-      ctx.fillStyle = COL.spikeSh;
-      if (bx - 1 >= innerLeft) ctx.fillRect(bx - 1, barBottom - 2, 1, 1);
-      if (bx + 1 <= innerRight) ctx.fillRect(bx + 1, barBottom - 2, 1, 1);
-    }
-
-    // Horizontal bar at top of gate (ties bars)
-    ctx.fillStyle = COL.gate;
-    ctx.fillRect(innerLeft, barTop, innerW, 1);
+  function drawPit(g){
+    // Spikes at the bottom of the gap, pointing up
+    const spikeBaseY = H - 2;
+    drawSpikes(g.left + 2, g.right - 2, spikeBaseY);
+    // Subtle floor line
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = INK;
+    ctx.fillRect(g.left, H - 1, g.right - g.left, 1);
+    ctx.globalAlpha = 1;
   }
 
-  function drawCounterWall(){
-    const wallX = 400;
-    const wallY = 60;
-    const wallW = 72;
-    const wallH = GROUND_Y - wallY;
-    drawBricks(wallX, wallY, wallW, wallH);
-
-    // Inset plate
-    const pX = wallX + 6, pY = wallY + 8, pW = wallW - 12, pH = 46;
-    ctx.fillStyle = COL.brickDark;
-    ctx.fillRect(pX - 1, pY - 1, pW + 2, pH + 2);
-    ctx.fillStyle = COL.mortar;
-    ctx.fillRect(pX, pY, pW, pH);
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-
-    // CLEARS label + value
-    ctx.fillStyle = COL.robe;
-    ctx.font = '6px "JetBrains Mono", monospace';
-    ctx.fillText('CLEARS', pX + pW/2, pY + 3);
-    ctx.font = 'bold 10px "JetBrains Mono", monospace';
-    ctx.fillText(String(state.clears).padStart(3, '0'), pX + pW/2, pY + 11);
-
-    // Divider
-    ctx.fillStyle = COL.brickDark;
-    ctx.fillRect(pX + 4, pY + 23, pW - 8, 1);
-
-    // FAILS label + value (red)
-    ctx.fillStyle = COL.robe;
-    ctx.font = '6px "JetBrains Mono", monospace';
-    ctx.fillText('FAILS', pX + pW/2, pY + 26);
-    ctx.fillStyle = COL.red;
-    ctx.font = 'bold 10px "JetBrains Mono", monospace';
-    ctx.fillText(String(state.fails).padStart(3, '0'), pX + pW/2, pY + 34);
+  function drawEndWall(){
+    // Simple vertical end block on platform C (marks the finish visually)
+    const x = platforms[2].right - 26;
+    const top = 70;
+    const w = 22;
+    const h = GROUND_Y - top;
+    ctx.fillStyle = INK;
+    ctx.globalAlpha = 0.08;
+    ctx.fillRect(x, top, w, h);
+    ctx.globalAlpha = 1;
+    // Outline
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(x, top, w, 1);       // top
+    ctx.fillRect(x, top, 1, h);       // left
+    ctx.fillRect(x + w - 1, top, 1, h); // right
+    ctx.globalAlpha = 1;
   }
 
   function drawPrince(){
@@ -2695,154 +2794,65 @@ function playTick(key){
     ctx.scale(state.facing, 1);
     ctx.translate(-PW/2, -PH/2);
 
-    const isWalk = state.mode === 'walking';
+    const isWalk = state.mode === 'walking' && state.moving;
     const isJump = state.mode === 'jumping' || state.mode === 'falling';
     const isDead = state.mode === 'dead';
     const frame = Math.floor(state.animT * 8) & 3;
 
-    // Hair (top)
-    ctx.fillStyle = COL.darkBrown;
-    ctx.fillRect(3, 0, 5, 2);
-    // Red headband
-    ctx.fillStyle = COL.red;
-    ctx.fillRect(3, 1, 5, 1);
-    ctx.fillStyle = COL.redSh;
-    ctx.fillRect(3, 2, 5, 1);
-    // Face
-    ctx.fillStyle = COL.skin;
-    ctx.fillRect(3, 3, 5, 3);
-    // Jaw shadow
-    ctx.fillStyle = COL.skinSh;
-    ctx.fillRect(3, 5, 5, 1);
-    // Eye
-    ctx.fillStyle = COL.darkBrown;
-    ctx.fillRect(6, 4, 1, 1);
+    ctx.fillStyle = INK;
 
-    // Neck
-    ctx.fillStyle = COL.skin;
-    ctx.fillRect(4, 6, 3, 1);
+    // Head (4x4)
+    ctx.fillRect(3, 0, 4, 4);
 
-    // Tunic (body)
-    ctx.fillStyle = COL.robe;
-    ctx.fillRect(2, 7, 7, 7);
-    ctx.fillStyle = COL.robeSh;
-    ctx.fillRect(7, 7, 1, 7);
-    ctx.fillRect(2, 13, 7, 1);
-    // V-neck detail
-    ctx.fillStyle = COL.robeSh;
-    ctx.fillRect(5, 7, 1, 1);
-
-    // Belt
-    ctx.fillStyle = COL.darkBrown;
-    ctx.fillRect(2, 14, 7, 1);
+    // Body (4x7)
+    ctx.fillRect(3, 5, 4, 7);
 
     // Arms
-    ctx.fillStyle = COL.skin;
     if (isJump){
-      ctx.fillRect(1, 6, 1, 4);
-      ctx.fillRect(8, 6, 1, 4);
-      ctx.fillStyle = COL.robe;
-      ctx.fillRect(1, 10, 1, 2);
-      ctx.fillRect(8, 10, 1, 2);
+      ctx.fillRect(1, 3, 1, 4); // arms up
+      ctx.fillRect(8, 3, 1, 4);
     } else if (isDead){
-      ctx.fillRect(1, 10, 1, 3);
-      ctx.fillRect(8, 10, 1, 3);
-    } else {
-      const armOff = (frame === 1 ? 1 : frame === 3 ? -1 : 0);
-      ctx.fillStyle = COL.robe;
       ctx.fillRect(1, 8, 1, 3);
       ctx.fillRect(8, 8, 1, 3);
-      ctx.fillStyle = COL.skin;
-      ctx.fillRect(1, 11 + armOff, 1, 2);
-      ctx.fillRect(8, 11 - armOff, 1, 2);
+    } else if (isWalk){
+      const off = (frame === 1) ? 1 : (frame === 3) ? -1 : 0;
+      ctx.fillRect(1, 6 + off, 1, 4);
+      ctx.fillRect(8, 6 - off, 1, 4);
+    } else {
+      ctx.fillRect(1, 7, 1, 4);
+      ctx.fillRect(8, 7, 1, 4);
     }
 
-    // Pants / legs
+    // Legs
     if (isJump){
-      ctx.fillStyle = COL.robe;
-      ctx.fillRect(3, 15, 2, 5);
-      ctx.fillRect(5, 15, 2, 5);
-      ctx.fillStyle = COL.robeSh;
-      ctx.fillRect(5, 15, 2, 1);
-      // feet tucked
-      ctx.fillStyle = COL.darkBrown;
-      ctx.fillRect(3, 20, 2, 1);
-      ctx.fillRect(5, 20, 2, 1);
+      ctx.fillRect(3, 13, 2, 5);
+      ctx.fillRect(5, 13, 2, 5);
     } else if (isDead){
-      ctx.fillStyle = COL.robe;
-      ctx.fillRect(3, 15, 2, 8);
-      ctx.fillRect(5, 15, 2, 8);
-      ctx.fillStyle = COL.darkBrown;
-      ctx.fillRect(3, 22, 2, 1);
-      ctx.fillRect(5, 22, 2, 1);
+      ctx.fillRect(3, 13, 2, 7);
+      ctx.fillRect(5, 13, 2, 7);
+    } else if (isWalk){
+      let lx = 0, rx = 0;
+      if (frame === 1){ lx = -1; rx = 1; }
+      else if (frame === 3){ lx = 1; rx = -1; }
+      ctx.fillRect(3 + lx, 13, 2, 8);
+      ctx.fillRect(5 + rx, 13, 2, 8);
     } else {
-      // Walk cycle: stride alternates
-      let lLegYOff = 0, rLegYOff = 0, lLegX = 0, rLegX = 0;
-      if (frame === 0){ lLegX = 0; rLegX = 0; }
-      else if (frame === 1){ lLegX = -1; rLegX = 1; lLegYOff = 1; }
-      else if (frame === 2){ lLegX = 0; rLegX = 0; }
-      else { lLegX = 1; rLegX = -1; rLegYOff = 1; }
-      ctx.fillStyle = COL.robe;
-      ctx.fillRect(3 + lLegX, 15, 2, 8 - lLegYOff);
-      ctx.fillRect(5 + rLegX, 15, 2, 8 - rLegYOff);
-      ctx.fillStyle = COL.robeSh;
-      ctx.fillRect(3 + lLegX, 22 - lLegYOff, 2, 1);
-      ctx.fillRect(5 + rLegX, 22 - rLegYOff, 2, 1);
-      ctx.fillStyle = COL.darkBrown;
-      ctx.fillRect(3 + lLegX, 23 - lLegYOff, 2, 1);
-      ctx.fillRect(5 + rLegX, 23 - rLegYOff, 2, 1);
+      ctx.fillRect(3, 13, 2, 8);
+      ctx.fillRect(5, 13, 2, 8);
     }
 
     ctx.restore();
   }
 
-  function drawSky(){
-    ctx.fillStyle = COL.bg;
-    ctx.fillRect(0, 0, W, H);
-    // Subtle far-back wall fragment (like ref image: bricks behind prince start)
-    ctx.fillStyle = COL.brickDark;
-    ctx.globalAlpha = 0.35;
-    drawBricks(0, 48, 60, 40, { dark: true });
-    ctx.globalAlpha = 1;
-  }
-
   function draw(){
-    drawSky();
-
-    // Platforms (brick body)
-    platforms.forEach(p => {
-      drawBricks(p.left, GROUND_Y, p.right - p.left, H - GROUND_Y);
-    });
-
-    // Pits: dark bricks at bottom, spikes pointing up
-    gaps.forEach(g => {
-      drawBricks(g.left, PIT_TOP, g.right - g.left, H - PIT_TOP, { dark: true });
-      drawSpikeRow(g.left, g.right, PIT_TOP, true);
-    });
-
-    // Gate
-    drawGate();
-
-    // Counter wall
-    drawCounterWall();
-
-    // Prince
+    ctx.clearRect(0, 0, W, H); // transparent
+    platforms.forEach(drawPlatform);
+    gaps.forEach(drawPit);
+    drawEndWall();
     drawPrince();
   }
 
   // ——— Collisions ———
-
-  function overlapsGate(x, y){
-    // Prince bounds
-    const pl = x, pr = x + PW, pt = y, pb = y + PH;
-    return !(pr <= gate.left + 2 || pl >= gate.right - 2 || pb <= gate.top + 1 || pt >= gate.bottom);
-  }
-  function onTopPlatformSpikes(x, y){
-    // The spike row on platform C (from platforms[2].left+4 to 395, at GROUND_Y)
-    const pcx = x + PW/2;
-    const pby = y + PH;
-    return (pcx > platforms[2].left + 4 && pcx < 395 && pby >= GROUND_Y - 2);
-  }
   function inGap(x){
     const pcx = x + PW/2;
     for (const g of gaps){
@@ -2853,124 +2863,96 @@ function playTick(key){
   function onPlatformFeet(x){
     const pcx = x + PW/2;
     for (const p of platforms){
-      if (pcx >= p.left + 1 && pcx <= p.right - 1) return p;
+      if (pcx >= p.left && pcx <= p.right) return p;
     }
     return null;
   }
 
-  // ——— Update loop ———
+  // ——— Update ———
   let lastT = null;
   function update(t){
     const dt = (lastT === null) ? 16 : Math.min(40, t - lastT);
     lastT = t;
-    const dts = dt / 16.67; // normalized to ~60fps
-    state.animT += dt / 1000;
+    const dts = dt / 16.67;
 
     switch (state.mode){
       case 'walking': {
-        state.x += state.vx * dts;
+        let dir = 0;
+        if (keys.left) dir -= 1;
+        if (keys.right) dir += 1;
+        state.moving = dir !== 0;
+        if (dir !== 0){
+          state.facing = dir;
+          state.animT += dt / 1000;
+          state.x += dir * WALK_SPEED * dts;
+        }
+        if (state.x < 0) state.x = 0;
         state.y = GROUND_Y - PH;
 
-        // Hit gate on foot
-        if (overlapsGate(state.x, state.y)){
-          state.mode = 'dead';
-          state.fails++;
-          state.phaseT = t;
-          break;
-        }
-        // Top-of-platform spikes (platform C, flavour)
-        if (onTopPlatformSpikes(state.x, state.y)){
-          state.mode = 'dead';
-          state.fails++;
-          state.phaseT = t;
-          break;
-        }
-        // Gap → fall
         if (inGap(state.x)){
           state.mode = 'falling';
           state.vy = 0;
-          state.vx *= 0.5;
+          state.vx = dir * 0.4;
           break;
         }
-        // Reached counter wall area → clear
-        if (state.x + PW >= 398){
+        if (state.x + PW/2 >= finishX){
           state.clears++;
+          renderBoard();
           state.mode = 'cleared';
           state.phaseT = t;
+          showPrompt();
         }
         break;
       }
       case 'jumping': {
         state.x += state.vx * dts;
-        state.vy += 0.21 * dts;
+        state.vy += GRAVITY * dts;
         state.y += state.vy * dts;
-
-        // Hit gate mid-jump?
-        if (overlapsGate(state.x, state.y)){
-          state.mode = 'dead';
-          state.fails++;
-          state.phaseT = t;
-          break;
-        }
-        // Land?
+        state.animT += dt / 1000;
         if (state.y >= GROUND_Y - PH){
           state.y = GROUND_Y - PH;
           state.vy = 0;
           const p = onPlatformFeet(state.x);
           if (p){
-            // Landing on top-spikes? Same check as walking
-            if (onTopPlatformSpikes(state.x, state.y)){
-              state.mode = 'dead';
-              state.fails++;
-              state.phaseT = t;
-            } else {
-              state.mode = 'walking';
-              state.vx = 0.65;
-            }
+            state.mode = 'walking';
+            state.vx = 0;
           } else {
             state.mode = 'falling';
-            state.vx *= 0.6;
           }
         }
         break;
       }
       case 'falling': {
-        state.vy += 0.22 * dts;
+        state.vy += GRAVITY * 1.1 * dts;
         state.y += state.vy * dts;
         state.x += state.vx * dts;
-        if (state.y + PH >= PIT_TOP - 1){
-          state.y = PIT_TOP - PH - 1;
+        state.tilt += 0.09 * dts;
+        if (state.y + PH >= H - 2){
+          state.y = H - PH - 2;
           state.mode = 'dead';
-          state.fails++;
           state.phaseT = t;
+          state.fails++;
+          renderBoard();
         }
         break;
       }
       case 'dead': {
         state.tilt = Math.min(Math.PI/2.2, state.tilt + 0.12 * dts);
-        if (t - state.phaseT > 1400) {
+        if (t - state.phaseT > 1200){
           state.mode = 'resetting';
           state.phaseT = t;
         }
         break;
       }
       case 'cleared': {
-        // Walk in place briefly, then reset
-        state.animT += dt / 1000; // keep walking animation
-        if (t - state.phaseT > 900){
-          state.mode = 'resetting';
-          state.phaseT = t;
-        }
+        // Waiting for player to submit name (or escape)
         break;
       }
       case 'resetting': {
-        if (t - state.phaseT > 250){
-          reset();
-        }
+        if (t - state.phaseT > 250) reset();
         break;
       }
     }
-
     draw();
   }
 
