@@ -2579,14 +2579,16 @@ function playTick(key){
   const GROUND_Y = 130;
   const platforms = [
     { left:   0, right:  90 },  // A start
-    { left: 135, right: 310 },  // B middle (no gate anymore)
+    { left: 135, right: 310 },  // B middle
     { left: 375, right: W   },  // C end
   ];
   const gaps = [
     { left:  90, right: 135 },  // small, 45 wide
     { left: 310, right: 375 },  // wider, 65 wide
   ];
-  const finishX = platforms[2].right - 30; // trigger zone near end
+  // Trampoline on platform B, right before the wide gap
+  const trampoline = { left: 260, right: 295, y: GROUND_Y };
+  const finishX = platforms[2].right - 30;
 
   // ——— Prince state ———
   const PW = 10, PH = 22;
@@ -2603,10 +2605,13 @@ function playTick(key){
     fails: 0,
     animT: 0,
     moving: false,
+    bouncing: false, // visual pulse on trampoline
   };
   const WALK_SPEED = 0.95;
-  const JUMP_VY = -3.0;
-  const JUMP_VX = 1.55;
+  const JUMP_VY = -3.1;
+  const JUMP_VX = 1.9;
+  const BOOST_VY = -6.2;  // trampoline: ~2x height
+  const BOOST_VX = 3.8;   // trampoline: ~2x distance
   const GRAVITY = 0.2;
 
   function reset(){
@@ -2626,14 +2631,25 @@ function playTick(key){
   }
 
   const keys = { left: false, right: false };
+
+  function onTrampoline(x){
+    const pcx = x + PW/2;
+    return pcx >= trampoline.left && pcx <= trampoline.right;
+  }
+
   function triggerJump(){
     if (state.mode !== 'walking') return;
     state.mode = 'jumping';
-    state.vy = JUMP_VY;
+    const boost = onTrampoline(state.x);
+    state.vy = boost ? BOOST_VY : JUMP_VY;
     let dir = 0;
     if (keys.right) dir = 1;
     if (keys.left) dir = -1;
-    state.vx = dir * JUMP_VX;
+    state.vx = dir * (boost ? BOOST_VX : JUMP_VX);
+    if (boost){
+      state.bouncing = true;
+      setTimeout(() => { state.bouncing = false; }, 200);
+    }
   }
 
   window.addEventListener('keydown', (e) => {
@@ -2767,6 +2783,40 @@ function playTick(key){
     ctx.globalAlpha = 1;
   }
 
+  function drawTrampoline(){
+    const x = trampoline.left;
+    const w = trampoline.right - trampoline.left;
+    const y = GROUND_Y;
+    // Base strip (slightly raised above ground)
+    ctx.fillStyle = INK;
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(x, y - 3, w, 2);
+    ctx.globalAlpha = 1;
+    // Springs (3 zig-zag lines)
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.6;
+    for (let i = 0; i < 3; i++){
+      const sx = x + 6 + i * ((w - 12) / 2);
+      ctx.beginPath();
+      ctx.moveTo(sx, y - 1);
+      ctx.lineTo(sx + 2, y - 2);
+      ctx.lineTo(sx, y - 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // Chevron arrow up in the center
+    const cx = x + w / 2;
+    const ay = y - 10;
+    ctx.fillStyle = INK;
+    ctx.globalAlpha = state.bouncing ? 1 : 0.45;
+    ctx.fillRect(cx - 3, ay + 2, 7, 1);
+    ctx.fillRect(cx - 2, ay + 1, 5, 1);
+    ctx.fillRect(cx - 1, ay, 3, 1);
+    ctx.fillRect(cx, ay - 1, 1, 1);
+    ctx.globalAlpha = 1;
+  }
+
   function drawEndWall(){
     // Simple vertical end block on platform C (marks the finish visually)
     const x = platforms[2].right - 26;
@@ -2848,22 +2898,19 @@ function playTick(key){
     ctx.clearRect(0, 0, W, H); // transparent
     platforms.forEach(drawPlatform);
     gaps.forEach(drawPit);
+    drawTrampoline();
     drawEndWall();
     drawPrince();
   }
 
   // ——— Collisions ———
-  function inGap(x){
-    const pcx = x + PW/2;
-    for (const g of gaps){
-      if (pcx > g.left && pcx < g.right) return g;
-    }
-    return null;
-  }
-  function onPlatformFeet(x){
-    const pcx = x + PW/2;
+  // Prince is considered on a platform if ANY part of his base overlaps one.
+  // Use a grace margin so landing on the edge counts.
+  function isOverAnyPlatform(x){
+    const left = x + 1;
+    const right = x + PW - 1;
     for (const p of platforms){
-      if (pcx >= p.left && pcx <= p.right) return p;
+      if (right > p.left && left < p.right) return p;
     }
     return null;
   }
@@ -2889,7 +2936,7 @@ function playTick(key){
         if (state.x < 0) state.x = 0;
         state.y = GROUND_Y - PH;
 
-        if (inGap(state.x)){
+        if (!isOverAnyPlatform(state.x)){
           state.mode = 'falling';
           state.vy = 0;
           state.vx = dir * 0.4;
@@ -2912,7 +2959,7 @@ function playTick(key){
         if (state.y >= GROUND_Y - PH){
           state.y = GROUND_Y - PH;
           state.vy = 0;
-          const p = onPlatformFeet(state.x);
+          const p = isOverAnyPlatform(state.x);
           if (p){
             state.mode = 'walking';
             state.vx = 0;
