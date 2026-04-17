@@ -526,12 +526,13 @@
     <div class="object-stage" data-stage="printer"></div>
     <div class="object-info">
       <div class="object-index">001 / 005 — 3D · print</div>
-      <h3 class="object-name">Sleutelhanger, laag voor laag.</h3>
-      <p class="object-desc">Een kleine sleutelhanger, geprint in PLA. De lagen zijn opzettelijk zichtbaar — het is geen fout, het is het bewijs dat er iets is gebouwd.</p>
+      <h3 class="object-name">Bambu Lab, aan het werk.</h3>
+      <p class="object-desc">Het zachte gezoem op de achtergrond is bijna een tweede klok geworden. Laag na laag bouwt hij kleine dingen voor in huis — haken, houders, een reparatie-stukje, af en toe iets cadeau. Nooit heel spannend, altijd iets aan het maken.</p>
       <div class="object-spec">
-        <span><b>materiaal</b> PLA</span>
-        <span><b>print-tijd</b> 2h 14m</span>
-        <span><b>layers</b> 0.2 mm</span>
+        <span><b>printer</b> Bambu Lab A1</span>
+        <span><b>filament</b> PLA</span>
+        <span><b>nozzle</b> 0.4 mm</span>
+        <span><b>layer</b> 0.2 mm</span>
       </div>
     </div>
   </div>
@@ -1321,33 +1322,107 @@
 
   /* ——— OBJECT FACTORIES ——— */
 
-  // 1) 3D-printed keychain (stacked rounded discs)
+  // 1) Bambu Lab printer — enclosed cube with moving head + growing print
   function printer(){
     const group = new THREE.Group();
-    const layers = 14;
     const mat = matteMat();
-    for (let i=0; i<layers; i++){
-      const r = 1 + Math.sin(i/layers*Math.PI)*0.12;
-      const geo = new THREE.CylinderGeometry(r, r, 0.08, 48);
-      const m = new THREE.Mesh(geo, mat);
-      m.position.y = -0.6 + i*0.09;
-      // tiny wobble per layer for "print" feel
-      m.position.x = (Math.random()-0.5)*0.012;
-      group.add(m);
-      // edge highlight
-      const edges = new THREE.EdgesGeometry(geo);
-      const line = new THREE.LineSegments(edges, lineMat());
-      line.position.copy(m.position);
-      line.material.opacity = 0.15;
-      line.material.transparent = true;
-      group.add(line);
+    const W = 1.5, H = 1.6;
+
+    // Enclosure frame (wireframe)
+    const frameGeo = new THREE.BoxGeometry(W, H, W);
+    const frameEdges = new THREE.EdgesGeometry(frameGeo);
+    const frameLines = new THREE.LineSegments(frameEdges, lineMat());
+    frameLines.material.transparent = true;
+    frameLines.material.opacity = 0.65;
+    group.add(frameLines);
+
+    // Subtle glass-like front panel
+    const glass = new THREE.Mesh(
+      new THREE.PlaneGeometry(W*0.95, H*0.95),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.05, side: THREE.DoubleSide })
+    );
+    glass.position.z = W/2;
+    group.add(glass);
+
+    // Print bed
+    const bedY = -H/2 + 0.08;
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(W*0.82, 0.04, W*0.82), mat);
+    bed.position.y = bedY;
+    group.add(bed);
+    const bedEdges = new THREE.EdgesGeometry(bed.geometry);
+    const bedLine = new THREE.LineSegments(bedEdges, lineMat());
+    bedLine.position.copy(bed.position);
+    bedLine.material.transparent = true;
+    bedLine.material.opacity = 0.3;
+    group.add(bedLine);
+
+    // Gantry rail (X-axis, along the top)
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, W*0.88, 10), mat);
+    rail.rotation.z = Math.PI/2;
+    rail.position.y = H/2 - 0.18;
+    group.add(rail);
+
+    // Toolhead
+    const headGroup = new THREE.Group();
+    headGroup.position.y = H/2 - 0.18;
+    group.add(headGroup);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.24), mat);
+    headGroup.add(head);
+    const headEdges = new THREE.LineSegments(new THREE.EdgesGeometry(head.geometry), lineMat());
+    headEdges.material.transparent = true;
+    headEdges.material.opacity = 0.4;
+    headGroup.add(headEdges);
+
+    // Nozzle
+    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 12), mat);
+    nozzle.position.y = -0.16;
+    nozzle.rotation.x = Math.PI;
+    headGroup.add(nozzle);
+
+    // Filament spool holder on side (little cylinder)
+    const spool = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.045, 10, 22), mat);
+    spool.position.set(-W/2 - 0.12, H/2 - 0.35, 0);
+    spool.rotation.y = Math.PI/2;
+    group.add(spool);
+
+    // The print growing on the bed — 20 layers forming a simple vase
+    const printGroup = new THREE.Group();
+    printGroup.position.y = bedY + 0.02;
+    group.add(printGroup);
+
+    const LAYERS = 20;
+    const LH = 0.028;
+    for (let i=0; i<LAYERS; i++){
+      const t = i / (LAYERS-1);
+      const r = 0.22 - Math.abs(t - 0.45) * 0.08;
+      const layer = new THREE.Mesh(new THREE.CylinderGeometry(r, r, LH, 28), mat);
+      layer.position.y = i * LH + LH/2;
+      layer.visible = false;
+      printGroup.add(layer);
     }
-    // little ring on top
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.18,0.04,12,32), mat);
-    ring.position.y = 0.85;
-    ring.rotation.x = Math.PI/2;
-    group.add(ring);
-    group.scale.setScalar(1.1);
+
+    // Animation: head wiggles, layers appear, then cycle
+    group.userData.onUpdate = (t) => {
+      const CYCLE = 14; // seconds per full print
+      const p = (t % CYCLE) / CYCLE;
+      const currentLayer = Math.floor(p * LAYERS);
+
+      for (let i=0; i<printGroup.children.length; i++){
+        printGroup.children[i].visible = i <= currentLayer;
+      }
+
+      // Head follows top of current layer
+      const targetY = bedY + 0.04 + currentLayer * LH + 0.18;
+      headGroup.position.y = targetY;
+
+      // X/Z wiggle to suggest printing motion
+      const fast = t * 5.5;
+      headGroup.position.x = Math.sin(fast) * 0.22;
+      headGroup.position.z = Math.cos(fast * 1.4) * 0.17;
+    };
+
+    group.scale.setScalar(1.05);
     return group;
   }
 
