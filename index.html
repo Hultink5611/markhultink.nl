@@ -458,7 +458,7 @@
     position: absolute;
     top: 50%;
     left: calc(50% - 2vw);
-    width: clamp(260px, 32%, 380px);
+    width: clamp(240px, 28%, 320px);
     max-height: 78%;
     padding: 18px 18px 16px;
     background: var(--card);
@@ -476,6 +476,14 @@
     transform: translate(0, -50%) scale(1);
     opacity: 1;
     pointer-events: auto;
+  }
+  /* Info text schuift organisch naar rechts zodat 'ie niet achter het portfolio verdwijnt */
+  .object-row[data-obj="meterkast"] .object-info{
+    transition: transform 0.55s cubic-bezier(.2,.9,.25,1.1), max-width 0.55s ease;
+  }
+  .object-row[data-obj="meterkast"].mk-open .object-info{
+    transform: translateX(clamp(80px, 18%, 240px));
+    max-width: clamp(240px, 22vw, 340px);
   }
   .mk-close{
     position: absolute; top: 6px; right: 8px;
@@ -522,6 +530,11 @@
     }
     .mk-portfolio.open{
       transform: scale(1);
+    }
+    /* Mobiel: info niet verschuiven, portfolio staat sowieso onder de stage */
+    .object-row[data-obj="meterkast"].mk-open .object-info{
+      transform: none;
+      max-width: none;
     }
   }
 
@@ -2631,9 +2644,11 @@
         if (themeBtn) themeBtn.click();
         // switch-state wordt gesynct via MutationObserver hieronder
       } else if (idx === 2){
-        // Groep 3: portfolio-paneel
-        const overlay = stage.closest('.object-row').querySelector('.mk-portfolio');
+        // Groep 3: portfolio-paneel (+ row krijgt .mk-open zodat info-text organisch naar rechts schuift)
+        const row = stage.closest('.object-row');
+        const overlay = row.querySelector('.mk-portfolio');
         if (overlay) overlay.classList.toggle('open', sw.userData.isOn);
+        row.classList.toggle('mk-open', sw.userData.isOn);
       }
     }
 
@@ -2645,6 +2660,7 @@
         e.stopPropagation();
         const overlay = row.querySelector('.mk-portfolio');
         if (overlay) overlay.classList.remove('open');
+        row.classList.remove('mk-open');
         switches[2].userData.isOn = false;
       });
     }
