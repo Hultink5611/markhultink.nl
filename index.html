@@ -453,22 +453,27 @@
     50%  { opacity: 0.3; }
     100% { opacity: 0; }
   }
+  .object-row[data-obj="meterkast"]{ position: relative; }
   .mk-portfolio{
-    position: absolute; top: 6%; right: -2%;
-    width: 58%; max-height: 88%;
+    position: absolute;
+    top: 50%;
+    left: calc(50% - 2vw);
+    width: clamp(260px, 32%, 380px);
+    max-height: 78%;
     padding: 18px 18px 16px;
     background: var(--card);
     border: 1px solid var(--ink);
     box-shadow: 6px 6px 0 0 var(--ink);
     z-index: 4;
-    transform: translateX(calc(100% + 20px));
+    transform-origin: left center;
+    transform: translate(-12%, -50%) scale(0.55);
     opacity: 0;
-    transition: transform 0.45s cubic-bezier(.6,.1,.2,1), opacity 0.25s ease;
+    transition: transform 0.55s cubic-bezier(.2,.9,.25,1.1), opacity 0.35s ease;
     pointer-events: none;
     overflow: auto;
   }
   .mk-portfolio.open{
-    transform: translateX(0);
+    transform: translate(0, -50%) scale(1);
     opacity: 1;
     pointer-events: auto;
   }
@@ -492,19 +497,32 @@
   }
   .mk-thumb{
     aspect-ratio: 1;
+    position: relative;
+    overflow: hidden;
     background:
       repeating-linear-gradient(45deg,
         var(--hair) 0 2px,
         transparent 2px 8px);
-    border: 1px dashed var(--ink);
-    display: grid; place-items: center;
-    font-family:'JetBrains Mono', monospace; font-size: 10px;
-    color: var(--mute); letter-spacing: .15em;
+    border: 1px solid var(--ink);
   }
-  .mk-portfolio-note{
-    margin-top: 12px;
-    font-family:'JetBrains Mono', monospace; font-size: 10px;
-    color: var(--mute); letter-spacing: .1em;
+  .mk-thumb img{
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  @media (max-width: 900px){
+    .mk-portfolio{
+      position: static;
+      width: 100%;
+      max-height: none;
+      margin-top: 20px;
+      transform: scale(0.95);
+      transform-origin: top center;
+    }
+    .mk-portfolio.open{
+      transform: scale(1);
+    }
   }
 
   .object-info{
@@ -1118,16 +1136,15 @@
   <div class="object-row" data-obj="meterkast">
     <div class="object-stage" data-stage="meterkast">
       <div class="mk-flash" aria-hidden="true"></div>
-      <div class="mk-portfolio" aria-hidden="true">
-        <button class="mk-close" type="button" aria-label="sluiten">×</button>
-        <div class="mk-portfolio-title">afgeronde klussen</div>
-        <div class="mk-portfolio-grid">
-          <div class="mk-thumb"><span>foto 01</span></div>
-          <div class="mk-thumb"><span>foto 02</span></div>
-          <div class="mk-thumb"><span>foto 03</span></div>
-          <div class="mk-thumb"><span>foto 04</span></div>
-        </div>
-        <div class="mk-portfolio-note">foto's komen later — /images/meterkasten/</div>
+    </div>
+    <div class="mk-portfolio" aria-hidden="true">
+      <button class="mk-close" type="button" aria-label="sluiten">×</button>
+      <div class="mk-portfolio-title">afgeronde klussen</div>
+      <div class="mk-portfolio-grid">
+        <div class="mk-thumb" data-i="1"><img src="images/meterkasten/01.jpg" alt="Afgeronde meterkast 1" loading="lazy" onerror="this.remove()"></div>
+        <div class="mk-thumb" data-i="2"><img src="images/meterkasten/02.jpg" alt="Afgeronde meterkast 2" loading="lazy" onerror="this.remove()"></div>
+        <div class="mk-thumb" data-i="3"><img src="images/meterkasten/03.jpg" alt="Afgeronde meterkast 3" loading="lazy" onerror="this.remove()"></div>
+        <div class="mk-thumb" data-i="4"><img src="images/meterkasten/04.jpg" alt="Afgeronde meterkast 4" loading="lazy" onerror="this.remove()"></div>
       </div>
     </div>
     <div class="object-info">
@@ -2615,17 +2632,18 @@
         // switch-state wordt gesynct via MutationObserver hieronder
       } else if (idx === 2){
         // Groep 3: portfolio-paneel
-        const overlay = stage.querySelector('.mk-portfolio');
+        const overlay = stage.closest('.object-row').querySelector('.mk-portfolio');
         if (overlay) overlay.classList.toggle('open', sw.userData.isOn);
       }
     }
 
     // Close-knop van portfolio sluit OOK de schakelaar
-    const closeBtn = stage.querySelector('.mk-close');
+    const row = stage.closest('.object-row');
+    const closeBtn = row && row.querySelector('.mk-close');
     if (closeBtn){
       closeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const overlay = stage.querySelector('.mk-portfolio');
+        const overlay = row.querySelector('.mk-portfolio');
         if (overlay) overlay.classList.remove('open');
         switches[2].userData.isOn = false;
       });
