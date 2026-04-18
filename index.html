@@ -2735,6 +2735,8 @@
 
     // Interaction
     stage.addEventListener('pointerdown', e=>{
+      // Skip overlay-children (bv. portfolio-kruisje) — anders slikt setPointerCapture hun click.
+      if (e.target.tagName !== 'CANVAS') return;
       state.dragging = true;
       state.lastX = e.clientX; state.lastY = e.clientY;
       stage.setPointerCapture(e.pointerId);
