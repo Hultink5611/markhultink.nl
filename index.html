@@ -258,15 +258,14 @@
   }
   .lp-arm{
     position: absolute;
-    right: 6px;           /* near center of mount */
+    right: 6px;
     top: 50%;
-    width: 92px;          /* reaches onto the platter when lowered */
+    width: 92px;
     height: 2px;
     margin-top: -1px;
     background: var(--ink);
-    transform-origin: 100% 50%;  /* pivot at the RIGHT end (mount side) */
-    transform: rotate(calc(-26deg + var(--arm-angle, 0deg)));
-    transition: transform 60ms linear;
+    transform-origin: 100% 50%;   /* pivot at mount side */
+    transform: rotate(calc(60deg - var(--arm-angle, 0deg)));
   }
   .lp-arm-head{
     position: absolute;
@@ -276,7 +275,8 @@
     border-radius: 1px;
   }
 
-  /* SVG string — path from tonearm mount up to a knot around the H */
+  /* SVG string — path from tonearm mount up to a knot around the H.
+     z-index 0 keeps it BEHIND the hero-name letters (z-index 1). */
   .lp-string{
     position: absolute;
     inset: 0;
@@ -284,20 +284,66 @@
     height: 100%;
     pointer-events: none;
     overflow: visible;
-    z-index: 3;
+    z-index: 0;
   }
   .lp-string path{
-    stroke: var(--ink);
+    stroke: var(--mute);
     stroke-width: 1;
     stroke-linecap: round;
-    opacity: 0.55;
+    opacity: 0.7;
     fill: none;
   }
   .lp-string circle{
-    stroke: var(--ink);
+    stroke: var(--mute);
     stroke-width: 1.2;
-    opacity: 0.75;
+    opacity: 0.85;
     fill: none;
+  }
+  /* Ensure hero-name letters sit on top of the string */
+  .hero-name{ position: relative; z-index: 1; }
+  /* LP stays in front of the string too */
+  .lp{ z-index: 2; }
+
+  /* Small knobs + switch on the deck (right half, below the tonearm mount) */
+  .lp-knobs{
+    position: absolute;
+    left: 128px;
+    bottom: 14px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .lp-knob{
+    width: 8px; height: 8px;
+    border: 1px solid var(--ink);
+    border-radius: 50%;
+    background: var(--bg);
+    position: relative;
+  }
+  .lp-knob::after{
+    content: '';
+    position: absolute;
+    left: 50%; top: 1px;
+    width: 1px; height: 2px;
+    background: var(--ink);
+    transform: translateX(-50%);
+  }
+  .lp-switch{
+    width: 14px; height: 5px;
+    border: 1px solid var(--ink);
+    background: var(--bg);
+    position: relative;
+  }
+  .lp-switch::after{
+    content: '';
+    position: absolute;
+    left: 1px; top: 0;
+    width: 5px; height: 3px;
+    margin-top: 0;
+    background: var(--ink);
+  }
+  .lp.is-playing .lp-switch::after{
+    left: auto; right: 1px;
   }
 
   .hero-meta{
@@ -855,6 +901,11 @@
         <div class="lp-arm" id="lpArm">
           <div class="lp-arm-head"></div>
         </div>
+      </div>
+      <div class="lp-knobs">
+        <div class="lp-knob"></div>
+        <div class="lp-knob"></div>
+        <div class="lp-switch"></div>
       </div>
     </div>
     <svg class="lp-string" id="lpString" aria-hidden="true">
@@ -2701,7 +2752,8 @@ function playTick(key){
     const stringSvg = document.getElementById('lpString');
     const stringPath = document.getElementById('lpStringPath');
     const stringKnot = document.getElementById('lpStringKnot');
-    if (!H || !lp || !arm || !stringPath || !stringKnot) {
+    const armHead = document.querySelector('.lp-arm-head');
+    if (!H || !lp || !arm || !stringPath || !stringKnot || !armHead) {
       setTimeout(init, 200);
       return;
     }
@@ -2897,7 +2949,7 @@ function playTick(key){
       H.style.transform = 'translateY(' + currentDrag + 'px)';
       // Arm angle: 0 = rest (fully up, -24deg base), MAX_DRAG = needle on record (0 extra)
       // We want angle to grow (become less negative) as drag increases
-      const armAngle = (currentDrag / MAX_DRAG) * 24; // 0..24deg
+      const armAngle = (currentDrag / MAX_DRAG) * 70; // 0..70deg (60 rest → -10 play)
       arm.style.setProperty('--arm-angle', armAngle + 'deg');
       updateString();
     }
@@ -2905,27 +2957,27 @@ function playTick(key){
     function updateString(){
       const heroRect = hero.getBoundingClientRect();
       const hRect = H.getBoundingClientRect();
-      const mRect = armMount.getBoundingClientRect();
-      // Knot sits on the H's crossbar (middle of the letter vertically and horizontally)
+      const headRect = armHead.getBoundingClientRect();
+      // Knot sits on the H's crossbar (middle of the letter)
       const kx = (hRect.left + hRect.width / 2) - heroRect.left;
       const ky = (hRect.top + hRect.height * 0.5) - heroRect.top;
       stringKnot.setAttribute('cx', kx);
       stringKnot.setAttribute('cy', ky);
 
-      // String path starts at the bottom of the knot circle, curves down to the tonearm mount
+      // String path ends at the tonearm HEAD (the needle tip)
       const knotR = 4;
       const startX = kx;
       const startY = ky + knotR + 0.5;
-      const mx = (mRect.left + mRect.width / 2) - heroRect.left;
-      const my = (mRect.top + mRect.height / 2) - heroRect.top;
+      const endX = (headRect.left + headRect.width / 2) - heroRect.left;
+      const endY = (headRect.top + headRect.height / 2) - heroRect.top;
       // Control point that sags slightly for natural drape
-      const dx = mx - startX;
-      const dy = my - startY;
+      const dx = endX - startX;
+      const dy = endY - startY;
       const ctrlX = startX + dx * 0.55;
-      const ctrlY = startY + dy * 0.35 + 18;  // sag
+      const ctrlY = startY + dy * 0.35 + 14;  // sag
       stringPath.setAttribute('d',
         'M ' + startX + ' ' + startY +
-        ' Q ' + ctrlX + ' ' + ctrlY + ' ' + mx + ' ' + my
+        ' Q ' + ctrlX + ' ' + ctrlY + ' ' + endX + ' ' + endY
       );
     }
 
