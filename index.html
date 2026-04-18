@@ -765,6 +765,34 @@
   }
   .game-prompt button:hover{ opacity: 0.8; }
 
+  /* Trampoline slider — positioned over platform A */
+  .game-trampoline-ctrl{
+    position: absolute;
+    left: 9%;
+    top: 6%;
+    height: 56%;
+    width: 20px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  #trampolineSlider{
+    pointer-events: all;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    height: 100%;
+    width: 20px;
+    cursor: ns-resize;
+    opacity: 0.45;
+    accent-color: var(--ink);
+    transition: opacity 0.15s;
+  }
+  #trampolineSlider:hover, #trampolineSlider:focus{ opacity: 1; }
+
   /* Hint at bottom of stage */
   .game-hint{
     position: absolute;
@@ -1121,6 +1149,9 @@
   <div class="object-row object-row--wide" data-obj="prince">
     <div class="object-stage game-stage" data-game="prince">
       <canvas id="princeGame" width="480" height="200"></canvas>
+      <div class="game-trampoline-ctrl">
+        <input type="range" id="trampolineSlider" min="0" max="100" value="0" title="schuif omhoog → trampoline naar links">
+      </div>
       <div class="game-board" id="gameBoard">
         <div class="game-board__row"><span>CLEARS</span><strong id="gameClears">000</strong></div>
         <div class="game-board__row game-board__row--fails"><span>FAILS</span><strong id="gameFails">000</strong></div>
@@ -3570,6 +3601,18 @@ function playTick(key){
   ];
   // Trampoline on platform B, right before the wide gap
   const trampoline = { left: 260, right: 295, y: GROUND_Y };
+
+  // Slider on platform A shifts the trampoline left
+  const sliderEl = document.getElementById('trampolineSlider');
+  if (sliderEl){
+    sliderEl.addEventListener('input', () => {
+      const shift = Math.round(parseInt(sliderEl.value, 10) * 0.8);
+      trampoline.left  = 260 - shift;
+      trampoline.right = 295 - shift;
+    });
+    sliderEl.addEventListener('pointerdown', e => e.stopPropagation());
+  }
+
   const finishX = platforms[2].right - 30;
 
   // ——— Prince state ———
@@ -3654,11 +3697,21 @@ function playTick(key){
     triggerJump();
   });
 
-  // ——— Hall of fame (localStorage) ———
-  const HALL_KEY = 'mh_prince_hall';
+  // ——— Hall of fame + persistent score (localStorage) ———
+  const HALL_KEY   = 'mh_prince_hall';
+  const SCORE_KEY  = 'mh_prince_score';
   let hall = [];
   try { hall = JSON.parse(localStorage.getItem(HALL_KEY) || '[]'); } catch(e) {}
   if (!Array.isArray(hall)) hall = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(SCORE_KEY) || '{}');
+    if (saved.clears) state.clears = saved.clears;
+    if (saved.fails)  state.fails  = saved.fails;
+  } catch(e) {}
+
+  function saveScore(){
+    try { localStorage.setItem(SCORE_KEY, JSON.stringify({ clears: state.clears, fails: state.fails })); } catch(e) {}
+  }
 
   const clearsEl = document.getElementById('gameClears');
   const failsEl  = document.getElementById('gameFails');
@@ -3926,6 +3979,7 @@ function playTick(key){
         }
         if (state.x + PW/2 >= finishX){
           state.clears++;
+          saveScore();
           renderBoard();
           state.mode = 'cleared';
           state.phaseT = t;
@@ -3961,6 +4015,7 @@ function playTick(key){
           state.mode = 'dead';
           state.phaseT = t;
           state.fails++;
+          saveScore();
           renderBoard();
         }
         break;
