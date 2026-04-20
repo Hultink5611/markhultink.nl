@@ -1,26 +1,22 @@
-// Cloudflare Pages Function — Prince-game scoreboard
+// Main Cloudflare Worker — serveert de statische site via ASSETS binding
+// en handelt /api/prince/scores af voor het Prins-game scoreboard.
 //
-// Expects a KV namespace binding named `PRINCE_KV` on the Pages project.
-// Dashboard → Pages → markhultink.nl → Settings → Functions → KV namespace bindings:
-//   Variable name: PRINCE_KV   →   KV namespace: (create one, any name)
-//
-// Endpoints:
-//   GET  /api/prince/scores  → { hall, fallen, clears }
-//   POST /api/prince/scores  body { name, fallenLetters? } → updated state
-//
-// `hall` holds at most 6 names (nieuwste eerst). When a 7e naam wordt
-// toegevoegd, laten we de cliënt de letters van positie 6 doorsturen als
-// `fallenLetters` met hun eindpositie; die gooien we achter in `fallen`.
+// Verwacht (optioneel) een KV binding genaamd `PRINCE_KV` voor globale scores.
+// Zonder binding geeft GET een lege state terug en POST een 503.
 
-const KEY = 'state';
 const HALL_MAX = 6;
 const FALLEN_MAX = 200;
 const NAME_MAX = 10;
 
 const defaultState = () => ({ hall: [], fallen: [], clears: 0 });
 
+function isValidLetter(l) {
+  return l && typeof l.c === 'string' && l.c.length === 1
+    && Number.isFinite(l.x) && Number.isFinite(l.y) && Number.isFinite(l.rot);
+}
+
 async function loadState(env) {
-  const raw = await env.PRINCE_KV.get(KEY, { type: 'json' });
+  const raw = await env.PRINCE_KV.get('state', { type: 'json' });
   const s = raw && typeof raw === 'object' ? raw : {};
   return {
     hall: Array.isArray(s.hall) ? s.hall.filter(n => typeof n === 'string').slice(0, HALL_MAX) : [],
@@ -29,14 +25,8 @@ async function loadState(env) {
   };
 }
 
-function isValidLetter(l) {
-  return l && typeof l.c === 'string' && l.c.length === 1
-    && Number.isFinite(l.x) && Number.isFinite(l.y) && Number.isFinite(l.rot);
-}
-
 function sanitizeName(input) {
   const s = String(input || '').trim().slice(0, NAME_MAX);
-  // Allow letters/digits/space/basic punctuation — block control chars and HTML
   if (!/^[\p{L}\p{N} .,'!?_-]+$/u.test(s)) return '';
   return s;
 }
@@ -62,18 +52,14 @@ function json(body, init = {}) {
   });
 }
 
-export async function onRequestGet({ env }) {
+async function handleScoresGet(env) {
   if (!env.PRINCE_KV) return json(defaultState());
-  try {
-    return json(await loadState(env));
-  } catch (e) {
-    return json(defaultState());
-  }
+  try { return json(await loadState(env)); }
+  catch { return json(defaultState()); }
 }
 
-export async function onRequestPost({ request, env }) {
+async function handleScoresPost(request, env) {
   if (!env.PRINCE_KV) return json({ error: 'no storage' }, { status: 503 });
-
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'bad json' }, { status: 400 }); }
@@ -82,12 +68,23 @@ export async function onRequestPost({ request, env }) {
   if (!name) return json({ error: 'bad name' }, { status: 400 });
 
   const newLetters = sanitizeLetters(body.fallenLetters);
-
   const state = await loadState(env);
   state.hall = [name, ...state.hall].slice(0, HALL_MAX);
   if (newLetters.length) state.fallen = [...state.fallen, ...newLetters].slice(-FALLEN_MAX);
   state.clears += 1;
 
-  await env.PRINCE_KV.put(KEY, JSON.stringify(state));
+  await env.PRINCE_KV.put('state', JSON.stringify(state));
   return json(state);
 }
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === '/api/prince/scores') {
+      if (request.method === 'GET')  return handleScoresGet(env);
+      if (request.method === 'POST') return handleScoresPost(request, env);
+      return new Response('method not allowed', { status: 405 });
+    }
+    return env.ASSETS.fetch(request);
+  },
+};
