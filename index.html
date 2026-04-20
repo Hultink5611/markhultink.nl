@@ -720,6 +720,41 @@
   .game-board__hall div:first-child{ opacity: 1; }
   .game-board__empty{ opacity: 0.25 !important; text-align: center; }
 
+  /* Pit onder het scorebord — oude winnaars stapelen zich hier op */
+  .game-pit{
+    position: relative;
+    margin-top: 10px;
+    height: 120px;
+    overflow: hidden;
+    color: var(--ink);
+  }
+  .game-pit__letters{
+    position: absolute;
+    inset: 0;
+    bottom: 7px; /* boven de spikes */
+  }
+  .game-pit__letter{
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0;
+    line-height: 1;
+    opacity: 0.55;
+    will-change: transform;
+    transform-origin: 50% 50%;
+    pointer-events: none;
+    user-select: none;
+  }
+  .game-pit__spikes{
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 7px;
+    display: block;
+    opacity: 0.9;
+  }
+
   /* Name prompt when finish reached */
   .game-prompt{
     position: absolute;
@@ -1128,6 +1163,10 @@
         <div class="game-board__row game-board__row--fails"><span>FAILS</span><strong id="gameFails">000</strong></div>
         <div class="game-board__divider"></div>
         <div class="game-board__hall" id="gameHall"><div class="game-board__empty">—</div></div>
+        <div class="game-pit" id="gamePit" aria-hidden="true">
+          <div class="game-pit__letters" id="gamePitLetters"></div>
+          <svg class="game-pit__spikes" id="gamePitSpikes" viewBox="0 0 100 7" preserveAspectRatio="none" aria-hidden="true"><path fill="currentColor" d=""/></svg>
+        </div>
       </div>
       <form class="game-prompt" id="gamePrompt" hidden autocomplete="off">
         <label>je naam?</label>
@@ -3657,20 +3696,30 @@ function playTick(key){
     triggerJump();
   });
 
-  // ——— Hall of fame + persistent score (localStorage) ———
-  const HALL_KEY   = 'mh_prince_hall';
-  const SCORE_KEY  = 'mh_prince_score';
+  // ——— Hall of fame + vallende letters ———
+  // Globale scores via /api/prince/scores (Cloudflare Pages Function + KV).
+  // Lokale fallback in localStorage zodat het ook offline werkt.
+  const API_URL    = '/api/prince/scores';
+  const HALL_KEY   = 'mh_prince_hall';   // cache {hall, fallen, clears}
+  const SCORE_KEY  = 'mh_prince_score';  // lokale fails-teller
   let hall = [];
-  try { hall = JSON.parse(localStorage.getItem(HALL_KEY) || '[]'); } catch(e) {}
-  if (!Array.isArray(hall)) hall = [];
+  let fallen = []; // [{c,x,y,rot}] — eindposities in pit-coords
+  try {
+    const cached = JSON.parse(localStorage.getItem(HALL_KEY) || '{}');
+    if (Array.isArray(cached.hall))   hall = cached.hall;
+    if (Array.isArray(cached.fallen)) fallen = cached.fallen;
+    if (Number.isFinite(cached.clears)) state.clears = cached.clears;
+  } catch(e) {}
   try {
     const saved = JSON.parse(localStorage.getItem(SCORE_KEY) || '{}');
-    if (saved.clears) state.clears = saved.clears;
-    if (saved.fails)  state.fails  = saved.fails;
+    if (saved.fails) state.fails = saved.fails;
   } catch(e) {}
 
-  function saveScore(){
-    try { localStorage.setItem(SCORE_KEY, JSON.stringify({ clears: state.clears, fails: state.fails })); } catch(e) {}
+  function saveLocalCache(){
+    try { localStorage.setItem(HALL_KEY, JSON.stringify({ hall, fallen, clears: state.clears })); } catch(e){}
+  }
+  function saveFails(){
+    try { localStorage.setItem(SCORE_KEY, JSON.stringify({ fails: state.fails })); } catch(e){}
   }
 
   const clearsEl = document.getElementById('gameClears');
@@ -3678,6 +3727,9 @@ function playTick(key){
   const hallEl   = document.getElementById('gameHall');
   const promptEl = document.getElementById('gamePrompt');
   const inputEl  = document.getElementById('gameNameInput');
+  const pitEl        = document.getElementById('gamePit');
+  const pitLettersEl = document.getElementById('gamePitLetters');
+  const pitSpikesPath= document.querySelector('#gamePitSpikes path');
 
   function esc(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function renderBoard(){
@@ -3689,7 +3741,154 @@ function playTick(key){
         : '<div class="game-board__empty">—</div>';
     }
   }
+
+  // ——— Pit met spikes en stapelende letters ———
+  const LETTER_W = 6, LETTER_H = 11, SPIKES_H = 7, PIT_GRAVITY = 0.12;
+  const flying = []; // actief vallende letters: {el,c,x,y,vx,vy,rot,rotVel}
+
+  (function buildSpikes(){
+    if (!pitSpikesPath) return;
+    const n = 20, sW = 100 / n;
+    let d = 'M0,7';
+    for (let i = 0; i < n; i++) d += ` L${(i+0.5)*sW},0 L${(i+1)*sW},7`;
+    d += ' Z';
+    pitSpikesPath.setAttribute('d', d);
+  })();
+
+  function pitSize(){
+    if (!pitEl) return { w: 0, h: 0 };
+    const r = pitEl.getBoundingClientRect();
+    return { w: r.width, h: r.height };
+  }
+
+  function renderFallen(){
+    if (!pitLettersEl) return;
+    pitLettersEl.innerHTML = '';
+    for (const l of fallen){
+      const el = document.createElement('span');
+      el.className = 'game-pit__letter';
+      el.textContent = l.c;
+      el.style.transform = `translate(${l.x}px, ${l.y}px) rotate(${l.rot}rad)`;
+      pitLettersEl.appendChild(el);
+    }
+  }
   renderBoard();
+  renderFallen();
+
+  function spawnFallingLetters(name){
+    if (!pitLettersEl) return [];
+    const chars = [...name];
+    const out = [];
+    chars.forEach((c, i) => {
+      const el = document.createElement('span');
+      el.className = 'game-pit__letter';
+      el.textContent = c;
+      const x = 10 + i * LETTER_W;
+      const y = -LETTER_H - i * 2;
+      el.style.transform = `translate(${x}px, ${y}px) rotate(0rad)`;
+      pitLettersEl.appendChild(el);
+      out.push({
+        el, c, x, y,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: 0.4 + Math.random() * 0.2,
+        rot: 0,
+        rotVel: (Math.random() - 0.5) * 0.04,
+      });
+    });
+    flying.push(...out);
+    return out;
+  }
+
+  function stepPit(dts){
+    if (!flying.length) return;
+    const { w: pitW, h: pitH } = pitSize();
+    if (pitW <= 0) return;
+    const floorY = pitH - SPIKES_H - LETTER_H;
+    for (let i = flying.length - 1; i >= 0; i--){
+      const f = flying[i];
+      f.vy += PIT_GRAVITY * dts;
+      f.y  += f.vy * dts;
+      f.x  += f.vx * dts;
+      f.rot += f.rotVel * dts;
+      if (f.x < 0){ f.x = 0; f.vx = Math.abs(f.vx) * 0.4; }
+      if (f.x + LETTER_W > pitW){ f.x = pitW - LETTER_W; f.vx = -Math.abs(f.vx) * 0.4; }
+
+      let landed = false;
+      if (f.y >= floorY){ f.y = floorY; landed = true; }
+
+      if (!landed){
+        for (const l of fallen){
+          if (f.x + LETTER_W > l.x && f.x < l.x + LETTER_W
+              && f.y + LETTER_H > l.y && f.y + LETTER_H - f.vy * dts <= l.y + 2){
+            f.y = l.y - LETTER_H; landed = true; break;
+          }
+        }
+      }
+
+      if (landed){
+        if (f.y < -LETTER_H){
+          // overflow: fade en verwijder
+          f.el.style.transition = 'opacity 500ms';
+          f.el.style.opacity = '0';
+          setTimeout(() => f.el.remove(), 550);
+        } else {
+          fallen.push({ c: f.c, x: Math.round(f.x*100)/100, y: Math.round(f.y*100)/100, rot: Math.round(f.rot*100)/100 });
+          f.el.style.transform = `translate(${f.x}px, ${f.y}px) rotate(${f.rot}rad)`;
+        }
+        flying.splice(i, 1);
+        saveLocalCache();
+        continue;
+      }
+      f.el.style.transform = `translate(${f.x}px, ${f.y}px) rotate(${f.rot}rad)`;
+    }
+  }
+
+  async function fetchScores(){
+    try {
+      const r = await fetch(API_URL, { cache: 'no-store' });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (Array.isArray(data.hall))   hall = data.hall;
+      if (Array.isArray(data.fallen)) fallen = data.fallen;
+      if (Number.isFinite(data.clears)) state.clears = data.clears;
+      saveLocalCache();
+      renderBoard();
+      renderFallen();
+    } catch(e){ /* geen net — cache blijft */ }
+  }
+  fetchScores();
+
+  function waitForRest(newFlying){
+    return new Promise(resolve => {
+      const t0 = performance.now();
+      (function tick(){
+        const done = newFlying.every(f => !flying.includes(f));
+        if (done || performance.now() - t0 > 4000){
+          resolve(newFlying.map(f => ({ c: f.c, x: f.x, y: f.y, rot: f.rot })));
+        } else requestAnimationFrame(tick);
+      })();
+    });
+  }
+
+  async function postScore(name, letters){
+    try {
+      const r = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, fallenLetters: letters }),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (Array.isArray(data.hall))   hall = data.hall;
+      if (Array.isArray(data.fallen)) fallen = data.fallen;
+      if (Number.isFinite(data.clears)) state.clears = data.clears;
+      saveLocalCache();
+      renderBoard();
+      // Blijf de al-lokaal-getekende letters hergebruiken i.p.v. flash
+      // (alleen re-render als het serveraantal afwijkt)
+      if (pitLettersEl && pitLettersEl.childElementCount !== fallen.length) renderFallen();
+    } catch(e){ /* offline — lokale cache is al bijgewerkt */ }
+  }
 
   function showPrompt(){
     if (!promptEl) return;
@@ -3701,13 +3900,19 @@ function playTick(key){
     promptEl.hidden = true;
     if (inputEl) inputEl.blur();
   }
-  function saveName(name){
+  async function saveName(name){
     name = (name || '').trim().slice(0, 10);
-    if (name){
-      hall.unshift(name);
-      hall = hall.slice(0, 6);
-      try { localStorage.setItem(HALL_KEY, JSON.stringify(hall)); } catch(e){}
-      renderBoard();
+    if (!name) return;
+    const bumped = hall.length >= 6 ? hall[5] : null;
+    hall = [name, ...hall].slice(0, 6);
+    saveLocalCache();
+    renderBoard();
+    if (bumped){
+      const newFlying = spawnFallingLetters(bumped);
+      const letters = await waitForRest(newFlying);
+      postScore(name, letters);
+    } else {
+      postScore(name, []);
     }
   }
   if (promptEl){
@@ -3944,7 +4149,7 @@ function playTick(key){
         }
         if (state.x + PW/2 >= finishX){
           state.clears++;
-          saveScore();
+          saveLocalCache();
           renderBoard();
           state.mode = 'cleared';
           state.phaseT = t;
@@ -3980,7 +4185,7 @@ function playTick(key){
           state.mode = 'dead';
           state.phaseT = t;
           state.fails++;
-          saveScore();
+          saveFails();
           renderBoard();
         }
         break;
@@ -4002,6 +4207,7 @@ function playTick(key){
         break;
       }
     }
+    stepPit(dts);
     draw();
   }
 

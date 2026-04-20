@@ -1,0 +1,10 @@
+{
+  "name": "wranglerhultink",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-04-01",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page"
+  }
+}
