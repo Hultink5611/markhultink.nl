@@ -3848,9 +3848,10 @@ function playTick(key){
       const r = await fetch(API_URL, { cache: 'no-store' });
       if (!r.ok) return;
       const data = await r.json();
-      if (Array.isArray(data.hall))   hall = data.hall;
-      if (Array.isArray(data.fallen)) fallen = data.fallen;
-      if (Number.isFinite(data.clears)) state.clears = data.clears;
+      // Nooit lokale data wissen als de API leeg teruggeeft (KV nog niet gevuld of binding kapot)
+      if (Array.isArray(data.hall)   && (data.hall.length   > 0 || hall.length   === 0)) hall   = data.hall;
+      if (Array.isArray(data.fallen) && (data.fallen.length > 0 || fallen.length === 0)) fallen = data.fallen;
+      if (Number.isFinite(data.clears) && data.clears > 0) state.clears = data.clears;
       saveLocalCache();
       renderBoard();
       renderFallen();
