@@ -1,7 +1,7 @@
 // Main Cloudflare Worker — serveert de statische site via ASSETS binding
 // en handelt /api/prince/scores af voor het Prins-game scoreboard.
 //
-// Verwacht (optioneel) een KV binding genaamd `worker_prince` voor globale scores.
+// Verwacht (optioneel) een KV binding genaamd `prince_game` voor globale scores.
 // Zonder binding geeft GET een lege state terug en POST een 503.
 
 const HALL_MAX = 6;
@@ -16,7 +16,7 @@ function isValidLetter(l) {
 }
 
 async function loadState(env) {
-  const raw = await env.worker_prince.get('state', { type: 'json' });
+  const raw = await env.prince_game.get('state', { type: 'json' });
   const s = raw && typeof raw === 'object' ? raw : {};
   return {
     hall: Array.isArray(s.hall) ? s.hall.filter(n => typeof n === 'string').slice(0, HALL_MAX) : [],
@@ -53,13 +53,13 @@ function json(body, init = {}) {
 }
 
 async function handleScoresGet(env) {
-  if (!env.worker_prince) return json(defaultState());
+  if (!env.prince_game) return json(defaultState());
   try { return json(await loadState(env)); }
   catch { return json(defaultState()); }
 }
 
 async function handleScoresPost(request, env) {
-  if (!env.worker_prince) return json({ error: 'no storage' }, { status: 503 });
+  if (!env.prince_game) return json({ error: 'no storage' }, { status: 503 });
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'bad json' }, { status: 400 }); }
@@ -73,7 +73,7 @@ async function handleScoresPost(request, env) {
   if (newLetters.length) state.fallen = [...state.fallen, ...newLetters].slice(-FALLEN_MAX);
   state.clears += 1;
 
-  await env.worker_prince.put('state', JSON.stringify(state));
+  await env.prince_game.put('state', JSON.stringify(state));
   return json(state);
 }
 
